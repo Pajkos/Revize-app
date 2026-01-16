@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Revizák Scan</title>
+    
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+
+    <style>
+        :root { --primary: #007bff; --success: #28a745; }
+        body { font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 15px; background: #f4f4f9; }
+        .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }
+        h2 { margin-top: 0; color: #333; font-size: 1.2rem; }
+        input, select { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
+        button { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1rem; margin-bottom: 10px; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        #reader { width: 100%; border-radius: 8px; overflow: hidden; }
+        .hidden { display: none; }
+        .status { font-size: 0.8rem; color: #666; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div id="setup-step">
+    <div class="card">
+        <h2>1. Načíst data z Illka</h2>
+        <input type="file" id="csv-file" accept=".csv">
+        <p class="status">Vyberte vyexportovaný soubor .csv</p>
+    </div>
+</div>
+
+<div id="scan-step" class="hidden">
+    <div class="card">
+        <h2>2. Skenovat / Hledat</h2>
+        <div id="reader"></div>
+        <input type="text" id="manual-search" placeholder="Zadejte ID ručně...">
+        <button class="btn-primary" onclick="searchById(document.getElementById('manual-search').value)">Hledat ručně</button>
+    </div>
+    <button onclick="downloadFinalCSV()" style="background:#333; color:white;">Exportovat hotové CSV</button>
+</div>
+
+<div id="form-step" class="hidden">
+    <div class="card">
+        <h2>Detail spotřebiče: <span id="display-id" style="color:var(--primary)"></span></h2>
+        <p id="display-name" style="font-weight:bold"></p>
+        
+        <label>Odpor ochranného vodiče (Rpe)</label>
+        <input type="number" id="field-Rpe" step="0.01" placeholder="0.00">
+        
+        <label>Izolační odpor (Riso)</label>
+        <input type="number" id="field-Riso" step="0.01" placeholder="0.00">
+
+        <label>Výsledek revize</label>
+        <select id="field-ResultTotal">
+            <option value="Passed">Vyhovuje</option>
+            <option value="Failed">Nevyhovuje</option>
+        </select>
+
+        <button class="btn-success" onclick="saveData()">ULOŽIT A DALŠÍ</button>
+        <button onclick="showScan()">ZPĚT NA SKENOVÁNÍ</button>
+    </div>
+</div>
+
+<script>
+    let csvData = [];
+    let currentIndex = -1;
+    let scanner = new Html5Qrcode("reader");
+
+    // 1. NAČTENÍ CSV
+    document.getElementById('csv-file').onchange = function(e) {
+        Papa.parse(e.target.files[0], {
+            header: true,
+            skipEmptyLines: true,
+            delimiter: ";",
+            complete: function(results) {
+                csvData = results.data;
+                alert("Načteno " + csvData.length + " spotřebičů.");
+                document.getElementById('setup-step').classList.add('hidden');
+                document.getElementById('scan-step').classList.remove('hidden');
+                startScanner();
+            }
+        });
+    };
+
+    // 2. SKENOVÁNÍ
+    function startScanner() {
+        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+        scanner.start({ facingMode: "environment" }, config, (text) => {
+            searchById(text);
+        });
+    }
+
+    // 3. VYHLEDÁNÍ SPOTŘEBIČE
+    function searchById(id) {
+        const index = csvData.findIndex(row => row.IdText === id);
+        if (index !== -1) {
+            openForm(index);
+        } else {
+            alert("Spotřebič s ID " + id + " nebyl v souboru nalezen.");
+        }
+    }
+
+    function openForm(index) {
+        currentIndex = index;
+        const item = csvData[index];
+        
+        document.getElementById('display-id').innerText = item.IdText;
+        document.getElementById('display-name').innerText = item.Name + " (" + (item.Tree1 || "") + ")";
+        
+        // Předvyplnění hodnot (pokud existují)
+        document.getElementById('field-Rpe').value = item.Rpe || "";
+        document.getElementById('field-ResultTotal').value = "Passed"; // Default
+        
+        document.getElementById('scan-step').classList.add('hidden');
+        document.getElementById('form-step').classList.remove('hidden');
+        
+        // Volitelně zastavit skener pro úsporu baterie
+        // scanner.pause();
+    }
+
+    // 4. ULOŽENÍ DAT
+    function saveData() {
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('cs-CZ').replace(/\s/g, ''); 
+        const timeStr = now.getHours() + ":" + String(now.getMinutes()).padStart(2, '0');
+
+        // Zápis do polí, která Illko očekává
+        csvData[currentIndex].Date = dateStr;
+        csvData[currentIndex].Time = timeStr;
+        csvData[currentIndex].ResultTotal = document.getElementById('field-ResultTotal').value;
+        csvData[currentIndex].Rpe = document.getElementById('field-Rpe').value;
+        csvData[currentIndex].RisoM_PE = document.getElementById('field-Riso').value;
+
+        alert("Uloženo.");
+        showScan();
+    }
+
+    function showScan() {
+        document.getElementById('form-step').classList.add('hidden');
+        document.getElementById('scan-step').classList.remove('hidden');
+    }
+
+    // 5. EXPORT ZPĚT DO CSV
+    function downloadFinalCSV() {
+        const csv = Papa.unparse(csvData, { delimiter: ";" });
+        const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' }); // Přidán BOM pro Excel/Illko
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute("download", "revize_hotovo.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+</script>
+
+</body>
+</html>
