@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Revizák Scan</title>
     
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
 
@@ -69,7 +74,6 @@
     let currentIndex = -1;
     let scanner = new Html5Qrcode("reader");
 
-    // 1. NAČTENÍ CSV
     document.getElementById('csv-file').onchange = function(e) {
         Papa.parse(e.target.files[0], {
             header: true,
@@ -85,7 +89,6 @@
         });
     };
 
-    // 2. SKENOVÁNÍ
     function startScanner() {
         const config = { fps: 10, qrbox: { width: 250, height: 250 } };
         scanner.start({ facingMode: "environment" }, config, (text) => {
@@ -93,7 +96,6 @@
         });
     }
 
-    // 3. VYHLEDÁNÍ SPOTŘEBIČE
     function searchById(id) {
         const index = csvData.findIndex(row => row.IdText === id);
         if (index !== -1) {
@@ -106,28 +108,19 @@
     function openForm(index) {
         currentIndex = index;
         const item = csvData[index];
-        
         document.getElementById('display-id').innerText = item.IdText;
         document.getElementById('display-name').innerText = item.Name + " (" + (item.Tree1 || "") + ")";
-        
-        // Předvyplnění hodnot (pokud existují)
         document.getElementById('field-Rpe').value = item.Rpe || "";
-        document.getElementById('field-ResultTotal').value = "Passed"; // Default
-        
+        document.getElementById('field-ResultTotal').value = "Passed";
         document.getElementById('scan-step').classList.add('hidden');
         document.getElementById('form-step').classList.remove('hidden');
-        
-        // Volitelně zastavit skener pro úsporu baterie
-        // scanner.pause();
     }
 
-    // 4. ULOŽENÍ DAT
     function saveData() {
         const now = new Date();
         const dateStr = now.toLocaleDateString('cs-CZ').replace(/\s/g, ''); 
         const timeStr = now.getHours() + ":" + String(now.getMinutes()).padStart(2, '0');
 
-        // Zápis do polí, která Illko očekává
         csvData[currentIndex].Date = dateStr;
         csvData[currentIndex].Time = timeStr;
         csvData[currentIndex].ResultTotal = document.getElementById('field-ResultTotal').value;
@@ -143,10 +136,9 @@
         document.getElementById('scan-step').classList.remove('hidden');
     }
 
-    // 5. EXPORT ZPĚT DO CSV
     function downloadFinalCSV() {
         const csv = Papa.unparse(csvData, { delimiter: ";" });
-        const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' }); // Přidán BOM pro Excel/Illko
+        const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
         link.setAttribute("download", "revize_hotovo.csv");
@@ -155,6 +147,5 @@
         document.body.removeChild(link);
     }
 </script>
-
 </body>
 </html>
