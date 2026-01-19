@@ -3,10 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Revizák Scan Pro</title>
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="icon.png">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Revizák Scan Pro v2</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -18,10 +15,8 @@
         button { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; }
         .btn-success { background: var(--success); color: white; margin-top: 10px; }
         .btn-primary { background: var(--primary); color: white; }
-        .btn-danger { background: var(--danger); color: white; }
         #reader { width: 100%; border-radius: 8px; overflow: hidden; background: #000; }
         .hidden { display: none; }
-        .val-auto { color: var(--primary); font-family: monospace; }
     </style>
 </head>
 <body>
@@ -40,12 +35,8 @@
         <input type="text" id="manual-search" placeholder="Zadejte IdText...">
         <button class="btn-primary" onclick="searchById(document.getElementById('manual-search').value)">Hledat ručně</button>
     </div>
-    
     <button onclick="downloadFinalCSV()" style="background:#333; color:white; margin-top:10px;">Exportovat hotové CSV</button>
-    
-    <button onclick="manualReset()" style="background:none; color:var(--danger); border: 1px solid var(--danger); margin-top:30px; padding: 10px; font-size: 0.8rem;">
-        Smazat aktuální data a nahrát jiný soubor
-    </button>
+    <button onclick="manualReset()" style="background:none; color:var(--danger); border: 1px solid var(--danger); margin-top:30px; padding: 10px; font-size: 0.8rem;">SMAZAT DATA A NAHRÁT NOVÝ SOUBOR</button>
 </div>
 
 <div id="form-step" class="hidden">
@@ -53,31 +44,19 @@
         <h3>Spotřebič: <span id="display-id" style="color:var(--primary)"></span></h3>
         <p id="display-name"></p>
         <hr>
-
         <label>Rpe (Odpor ochranného vodiče)</label>
-        <input type="text" id="field-Rpe" placeholder="např. 0.10">
-
+        <input type="text" id="field-Rpe">
         <label>IdifEq (Unikající proud)</label>
-        <input type="text" id="field-IdifEq" placeholder="0.00">
-
+        <input type="text" id="field-IdifEq">
         <label>IdifTouch (Dotykový proud)</label>
-        <input type="text" id="field-IdifTouch" placeholder="0.00">
-
+        <input type="text" id="field-IdifTouch">
         <label>RisoM_PE (Izolační odpor)</label>
         <input type="text" id="field-Riso" value=">19,99">
-
-        <label>Výsledek (Result & ResultTotal)</label>
+        <label>Výsledek</label>
         <select id="field-Result">
-            <option value="Passed">Passed (Vyhovuje)</option>
-            <option value="Failed">Failed (Nevyhovuje)</option>
+            <option value="Passed">Passed</option>
+            <option value="Failed">Failed</option>
         </select>
-
-        <div style="font-size: 0.8rem; background: #eee; padding: 10px; border-radius: 5px;">
-            Automaticky se zapíše:<br>
-            LastRev & Date: <span id="auto-date" class="val-auto"></span><br>
-            NextRev: <span id="auto-next" class="val-auto"></span> (Interval: <span id="auto-interval"></span> m)
-        </div>
-
         <button class="btn-success" onclick="saveData()">ULOŽIT A DALŠÍ</button>
         <button onclick="showScan()" style="margin-top:10px; background:none; color:#666;">Zrušit</button>
     </div>
@@ -85,13 +64,16 @@
 
 <script>
     let csvData = [];
+    let originalColumns = []; 
     let currentIndex = -1;
     let scanner = new Html5Qrcode("reader");
 
     window.onload = () => {
         const savedData = localStorage.getItem('revize_data');
-        if (savedData) {
+        const savedCols = localStorage.getItem('revize_cols');
+        if (savedData && savedCols) {
             csvData = JSON.parse(savedData);
+            originalColumns = JSON.parse(savedCols);
             document.getElementById('setup-step').classList.add('hidden');
             document.getElementById('scan-step').classList.remove('hidden');
             startScanner();
@@ -103,7 +85,9 @@
             header: true, skipEmptyLines: true, delimiter: ";",
             complete: function(results) {
                 csvData = results.data;
+                originalColumns = results.meta.fields; // Uloží přesné pořadí sloupců
                 localStorage.setItem('revize_data', JSON.stringify(csvData));
+                localStorage.setItem('revize_cols', JSON.stringify(originalColumns));
                 location.reload();
             }
         });
@@ -111,7 +95,7 @@
 
     function startScanner() {
         scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (text) => searchById(text))
-               .catch(err => console.error("Chyba skeneru: ", err));
+               .catch(err => console.error(err));
     }
 
     function searchById(id) {
@@ -123,25 +107,11 @@
     function openForm(index) {
         currentIndex = index;
         const item = csvData[index];
-        const now = new Date();
-        
         document.getElementById('display-id').innerText = item.IdText;
         document.getElementById('display-name').innerText = item.Name;
-        
-        const interval = parseInt(item.Interval) || 12;
-        const nextDate = new Date();
-        nextDate.setMonth(now.getMonth() + interval);
-
-        document.getElementById('auto-date').innerText = now.toLocaleDateString('cs-CZ');
-        document.getElementById('auto-next').innerText = nextDate.toLocaleDateString('cs-CZ');
-        document.getElementById('auto-interval').innerText = interval;
-
         document.getElementById('field-Rpe').value = item.Rpe || "";
         document.getElementById('field-IdifEq').value = item.IdifEq || "";
         document.getElementById('field-IdifTouch').value = item.IdifTouch || "";
-        document.getElementById('field-Riso').value = ">19,99";
-        document.getElementById('field-Result').value = "Passed";
-
         document.getElementById('scan-step').classList.add('hidden');
         document.getElementById('form-step').classList.remove('hidden');
     }
@@ -149,25 +119,20 @@
     function saveData() {
         const item = csvData[currentIndex];
         const now = new Date();
-        
-        const datePart = now.toLocaleDateString('cs-CZ').replace(/\s/g, '');
-        const fullDateIllko = datePart + " 0:00:00";
-        
+        const dateStr = now.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00";
         const interval = parseInt(item.Interval) || 12;
         const nextDate = new Date();
         nextDate.setMonth(now.getMonth() + interval);
-        const nextDateIllko = nextDate.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00";
+        const nextDateStr = nextDate.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00";
 
-        item.LastRev = fullDateIllko;
-        item.Date = fullDateIllko;
-        item.NextRev = nextDateIllko;
+        item.LastRev = dateStr;
+        item.Date = dateStr;
+        item.NextRev = nextDateStr;
         item.Time = "00:00:00";
-        
         item.Rpe = document.getElementById('field-Rpe').value;
         item.IdifEq = document.getElementById('field-IdifEq').value;
         item.IdifTouch = document.getElementById('field-IdifTouch').value;
         item.RisoM_PE = document.getElementById('field-Riso').value;
-        
         const res = document.getElementById('field-Result').value;
         item.Result = res;
         item.ResultTotal = res;
@@ -181,45 +146,37 @@
         document.getElementById('scan-step').classList.remove('hidden');
     }
 
-    // OPRAVENÁ FUNKCE EXPORTU S RESETEM
     function downloadFinalCSV() {
-    if (!csvData || csvData.length === 0) {
-        alert("Žádná data k exportu!");
-        return;
+        if (!csvData.length) return;
+
+        // TADY SE DĚJE TA MAGIE: Použijeme fields pro vynucení pořadí
+        const csv = Papa.unparse({
+            fields: originalColumns, 
+            data: csvData
+        }, { 
+            delimiter: ";", 
+            quotes: true, 
+            newline: "\r\n"
+        });
+
+        const BOM = "\uFEFF";
+        const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute("download", "export_pro_illko.csv");
+        link.click();
+        
+        setTimeout(() => {
+            if(confirm("Exportováno. Chcete aplikaci vyčistit pro nový soubor?")) {
+                manualReset();
+            }
+        }, 500);
     }
 
-    // Získáme klíče (názvy sloupců) přesně tak, jak přišly z původního souboru
-    const allColumns = Object.keys(csvData[0]);
-
-    const csv = Papa.unparse(csvData, { 
-        delimiter: ";", 
-        quotes: true,
-        header: true,
-        newline: "\r\n",
-        columns: allColumns // Zajišťuje, že pořadí sloupců zůstane identické s originálem
-    });
-
-    const BOM = "\uFEFF";
-    const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", "opraveny_export_pro_illko.csv");
-    link.click();
-
-    setTimeout(() => {
-        if (confirm("Exportováno. Chcete nyní aplikaci vyčistit pro nový soubor?")) {
-            localStorage.removeItem('revize_data');
-            location.reload();
-        }
-    }, 500);
-}
-
-    // NOVÁ FUNKCE PRO RUČNÍ RESET
     function manualReset() {
-        if (confirm("Opravdu chcete smazat všechna data v aplikaci a začít znovu s novým souborem?")) {
-            localStorage.removeItem('revize_data');
-            location.reload();
-        }
+        localStorage.removeItem('revize_data');
+        localStorage.removeItem('revize_cols');
+        location.reload();
     }
 </script>
 </body>
