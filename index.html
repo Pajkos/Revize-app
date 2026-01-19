@@ -136,12 +136,26 @@
         document.getElementById('scan-step').classList.remove('hidden');
     }
 
-    function downloadFinalCSV() {
-        const csv = Papa.unparse(csvData, { delimiter: ";" });
-        const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
+function downloadFinalCSV() {
+        // Vynutíme uvozovky u všech polí, aby Illko soubor správně přečetlo
+        const csv = Papa.unparse(csvData, { 
+            delimiter: ";",
+            quotes: true,      // Každá hodnota bude v "uvozovkách"
+            quoteChar: '"',
+            escapeChar: '"',
+            header: true
+        });
+
+        // Vytvoříme soubor s UTF-8 BOM (speciální znaky pro české kódování)
+        const BOM = "\uFEFF";
+        const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+        
+        // Vytvoření odkazu ke stažení
         const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.setAttribute("download", "revize_hotovo.csv");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", "export_pro_ilko.csv");
+        link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
