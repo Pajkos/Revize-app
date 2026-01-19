@@ -179,28 +179,50 @@
         document.getElementById('scan-step').classList.remove('hidden');
     }
 
-  function downloadFinalCSV() {
-        // Získáme seznam všech sloupců z prvního řádku (hlavičky), 
-        // abychom zajistili, že exportér žádný sloupec nevynechá.
-        const allColumns = Object.keys(csvData[0]);
-
-        const csv = Papa.unparse({
-            fields: allColumns, // Vynutí export všech sloupců v přesném pořadí
-            data: csvData
-        }, { 
-            delimiter: ";", 
-            quotes: true,      // Vše do uvozovek (důležité pro Illko)
-            header: true,
-            newline: "\r\n"    // Vynutí Windows formát konců řádků (Illko ho preferuje)
-        });
-
-        const BOM = "\uFEFF";
-        const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.setAttribute("download", "export_illko_oprava.csv");
-        link.click();
+ function downloadFinalCSV() {
+    if (!csvData || csvData.length === 0) {
+        alert("Žádná data k exportu!");
+        return;
     }
+
+    // 1. Získání sloupců a generování CSV (vaše funkční logika)
+    const allColumns = Object.keys(csvData[0]);
+    const csv = Papa.unparse({
+        fields: allColumns,
+        data: csvData
+    }, { 
+        delimiter: ";", 
+        quotes: true,      
+        header: true,
+        newline: "\r\n"    
+    });
+
+    // 2. Samotné stažení souboru
+    const BOM = "\uFEFF";
+    const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute("download", "export_illko_oprava.csv");
+    link.click();
+
+    // --- KLÍČOVÁ ZMĚNA ZDE ---
+    // 3. Resetování aplikace do výchozího stavu
+    setTimeout(() => {
+        // Vymažeme data z paměti aplikace
+        setCsvData([]); 
+        
+        // Pokud používáte nějaký stav pro uložení souboru (např. file), nastavte ho na null
+        // setFile(null); 
+
+        // Pokud ukládáte data do prohlížeče (LocalStorage), musíte je smazat i tam
+        localStorage.removeItem('lastCsvData'); 
+
+        alert("Export dokončen. Aplikace byla resetována pro nový soubor.");
+        
+        // Volitelně: Obnovení stránky pro úplnou čistotu
+        window.location.reload(); 
+    }, 500);
+}
 </script>
 </body>
 </html>
