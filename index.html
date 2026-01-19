@@ -18,6 +18,7 @@
         button { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; }
         .btn-success { background: var(--success); color: white; margin-top: 10px; }
         .btn-primary { background: var(--primary); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
         #reader { width: 100%; border-radius: 8px; overflow: hidden; background: #000; }
         .hidden { display: none; }
         .val-auto { color: var(--primary); font-family: monospace; }
@@ -39,7 +40,12 @@
         <input type="text" id="manual-search" placeholder="Zadejte IdText...">
         <button class="btn-primary" onclick="searchById(document.getElementById('manual-search').value)">Hledat ručně</button>
     </div>
+    
     <button onclick="downloadFinalCSV()" style="background:#333; color:white; margin-top:10px;">Exportovat hotové CSV</button>
+    
+    <button onclick="manualReset()" style="background:none; color:var(--danger); border: 1px solid var(--danger); margin-top:30px; padding: 10px; font-size: 0.8rem;">
+        Smazat aktuální data a nahrát jiný soubor
+    </button>
 </div>
 
 <div id="form-step" class="hidden">
@@ -104,7 +110,8 @@
     };
 
     function startScanner() {
-        scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (text) => searchById(text));
+        scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (text) => searchById(text))
+               .catch(err => console.error("Chyba skeneru: ", err));
     }
 
     function searchById(id) {
@@ -121,7 +128,6 @@
         document.getElementById('display-id').innerText = item.IdText;
         document.getElementById('display-name').innerText = item.Name;
         
-        // Výpočet termínů pro zobrazení
         const interval = parseInt(item.Interval) || 12;
         const nextDate = new Date();
         nextDate.setMonth(now.getMonth() + interval);
@@ -130,7 +136,6 @@
         document.getElementById('auto-next').innerText = nextDate.toLocaleDateString('cs-CZ');
         document.getElementById('auto-interval').innerText = interval;
 
-        // Reset polí na původní nebo prázdné
         document.getElementById('field-Rpe').value = item.Rpe || "";
         document.getElementById('field-IdifEq').value = item.IdifEq || "";
         document.getElementById('field-IdifTouch').value = item.IdifTouch || "";
@@ -145,21 +150,18 @@
         const item = csvData[currentIndex];
         const now = new Date();
         
-        // Formátování data pro Illko: DD.MM.YYYY 0:00:00
         const datePart = now.toLocaleDateString('cs-CZ').replace(/\s/g, '');
         const fullDateIllko = datePart + " 0:00:00";
         
-        // Výpočet NextRev
         const interval = parseInt(item.Interval) || 12;
         const nextDate = new Date();
         nextDate.setMonth(now.getMonth() + interval);
         const nextDateIllko = nextDate.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00";
 
-        // Zápis dat
         item.LastRev = fullDateIllko;
         item.Date = fullDateIllko;
         item.NextRev = nextDateIllko;
-        item.Time = "00:00:00"; // Illko formát nuly
+        item.Time = "00:00:00";
         
         item.Rpe = document.getElementById('field-Rpe').value;
         item.IdifEq = document.getElementById('field-IdifEq').value;
@@ -179,46 +181,46 @@
         document.getElementById('scan-step').classList.remove('hidden');
     }
 
-function downloadFinalCSV() {
-    if (!csvData || csvData.length === 0) {
-        alert("Žádná data k exportu!");
-        return;
+    // OPRAVENÁ FUNKCE EXPORTU S RESETEM
+    function downloadFinalCSV() {
+        if (!csvData || csvData.length === 0) {
+            alert("Žádná data k exportu!");
+            return;
+        }
+
+        const allColumns = Object.keys(csvData[0]);
+        const csv = Papa.unparse({
+            fields: allColumns,
+            data: csvData
+        }, { 
+            delimiter: ";", 
+            quotes: true,      
+            header: true,
+            newline: "\r\n"    
+        });
+
+        const BOM = "\uFEFF";
+        const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute("download", "export_illko_hotovo.csv");
+        link.click();
+
+        setTimeout(() => {
+            if (confirm("Export dokončen. Chcete aplikaci vymazat pro nahrání nového souboru?")) {
+                localStorage.removeItem('revize_data');
+                location.reload();
+            }
+        }, 500);
     }
 
-    // 1. Získání sloupců a generování CSV
-    const allColumns = Object.keys(csvData[0]);
-    const csv = Papa.unparse({
-        fields: allColumns,
-        data: csvData
-    }, { 
-        delimiter: ";", 
-        quotes: true,      
-        header: true,
-        newline: "\r\n"    
-    });
-
-    // 2. Samotné stažení souboru
-    const BOM = "\uFEFF";
-    const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", "export_illko_oprava.csv");
-    link.click();
-
-    // 3. RESET APLIKACE (Opraveno pro váš kód)
-    setTimeout(() => {
-        // Vymažeme uložená data z prohlížeče
-        localStorage.removeItem('revize_data');
-        
-        // Vynulujeme proměnnou v paměti
-        csvData = [];
-        
-        alert("Export dokončen. Aplikace se nyní resetuje pro nový soubor.");
-        
-        // Úplné obnovení stránky - to vás vrátí na obrazovku "Načíst data z Illka"
-        location.reload();
-    }, 500);
-}
+    // NOVÁ FUNKCE PRO RUČNÍ RESET
+    function manualReset() {
+        if (confirm("Opravdu chcete smazat všechna data v aplikaci a začít znovu s novým souborem?")) {
+            localStorage.removeItem('revize_data');
+            location.reload();
+        }
+    }
 </script>
 </body>
 </html>
