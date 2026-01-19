@@ -183,36 +183,36 @@
 
     // OPRAVENÁ FUNKCE EXPORTU S RESETEM
     function downloadFinalCSV() {
-        if (!csvData || csvData.length === 0) {
-            alert("Žádná data k exportu!");
-            return;
-        }
-
-        const allColumns = Object.keys(csvData[0]);
-        const csv = Papa.unparse({
-            fields: allColumns,
-            data: csvData
-        }, { 
-            delimiter: ";", 
-            quotes: true,      
-            header: true,
-            newline: "\r\n"    
-        });
-
-        const BOM = "\uFEFF";
-        const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.setAttribute("download", "export_illko_hotovo.csv");
-        link.click();
-
-        setTimeout(() => {
-            if (confirm("Export dokončen. Chcete aplikaci vymazat pro nahrání nového souboru?")) {
-                localStorage.removeItem('revize_data');
-                location.reload();
-            }
-        }, 500);
+    if (!csvData || csvData.length === 0) {
+        alert("Žádná data k exportu!");
+        return;
     }
+
+    // Získáme klíče (názvy sloupců) přesně tak, jak přišly z původního souboru
+    const allColumns = Object.keys(csvData[0]);
+
+    const csv = Papa.unparse(csvData, { 
+        delimiter: ";", 
+        quotes: true,
+        header: true,
+        newline: "\r\n",
+        columns: allColumns // Zajišťuje, že pořadí sloupců zůstane identické s originálem
+    });
+
+    const BOM = "\uFEFF";
+    const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute("download", "opraveny_export_pro_illko.csv");
+    link.click();
+
+    setTimeout(() => {
+        if (confirm("Exportováno. Chcete nyní aplikaci vyčistit pro nový soubor?")) {
+            localStorage.removeItem('revize_data');
+            location.reload();
+        }
+    }, 500);
+}
 
     // NOVÁ FUNKCE PRO RUČNÍ RESET
     function manualReset() {
