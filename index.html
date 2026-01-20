@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Revizák Scan Pro – Czech Fix</title>
+    <title>Revizák Scan Pro – ILLKO Compatibility Fix</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -25,7 +25,6 @@
     <div class="card">
         <h2>1. Nahrát originál z Illka</h2>
         <input type="file" id="csv-file" accept=".csv">
-        <p id="loading-msg" style="color: var(--primary); font-weight: bold; display: none;">Načítám data, moment...</p>
     </div>
 </div>
 
@@ -71,69 +70,31 @@
         const d = localStorage.getItem('revize_data');
         const h = localStorage.getItem('revize_headers');
         if (d && h) {
-            try {
-                csvData = JSON.parse(d);
-                csvHeaders = JSON.parse(h);
-                document.getElementById('setup-step').classList.add('hidden');
-                document.getElementById('scan-step').classList.remove('hidden');
-                startScanner();
-            } catch (e) {
-                console.error("Chyba při načítání paměti, resetuji...");
-                localStorage.clear();
-            }
+            csvData = JSON.parse(d);
+            csvHeaders = JSON.parse(h);
+            document.getElementById('setup-step').classList.add('hidden');
+            document.getElementById('scan-step').classList.remove('hidden');
+            startScanner();
         }
     };
 
     document.getElementById('csv-file').onchange = function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        document.getElementById('loading-msg').style.display = 'block';
-
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            const text = event.target.result;
-            Papa.parse(text, {
-                header: true,
-                skipEmptyLines: false,
-                delimiter: ";",
-                complete: function(results) {
-                    if (results.data && results.data.length > 0) {
-                        csvData = results.data;
-                        csvHeaders = results.meta.fields; 
-                        localStorage.setItem('revize_data', JSON.stringify(csvData));
-                        localStorage.setItem('revize_headers', JSON.stringify(csvHeaders));
-                        
-                        // Okamžité přepnutí bez čekání na refresh
-                        document.getElementById('setup-step').classList.add('hidden');
-                        document.getElementById('scan-step').classList.remove('hidden');
-                        startScanner();
-                        location.reload(); // Pro jistotu čistého stavu
-                    } else {
-                        alert("Soubor se nepodařilo zpracovat. Je to správné CSV?");
-                        document.getElementById('loading-msg').style.display = 'none';
-                    }
-                },
-                error: function(err) {
-                    alert("Chyba při parsování CSV: " + err);
-                    document.getElementById('loading-msg').style.display = 'none';
-                }
-            });
-        };
-
-        reader.onerror = function() {
-            alert("Chyba při čtení souboru z disku.");
-            document.getElementById('loading-msg').style.display = 'none';
-        };
-
-        reader.readAsText(file, 'windows-1250');
+        Papa.parse(e.target.files[0], {
+            header: true,
+            skipEmptyLines: false,
+            delimiter: ";",
+            complete: function(results) {
+                csvData = results.data;
+                csvHeaders = results.meta.fields; 
+                localStorage.setItem('revize_data', JSON.stringify(csvData));
+                localStorage.setItem('revize_headers', JSON.stringify(csvHeaders));
+                location.reload();
+            }
+        });
     };
 
     function startScanner() {
-        scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (t) => searchById(t))
-        .catch(err => {
-            console.log("Skener čeká na zapnutí kamery...");
-        });
+        scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (t) => searchById(t)).catch(() => {});
     }
 
     function searchById(id) {
@@ -145,8 +106,8 @@
     function openForm(idx) {
         currentIndex = idx;
         const row = csvData[idx];
-        document.getElementById('display-id').innerText = row.IdText || "---";
-        document.getElementById('display-name').innerText = row.Name || "---";
+        document.getElementById('display-id').innerText = row.IdText;
+        document.getElementById('display-name').innerText = row.Name;
         document.getElementById('field-Rpe').value = row.Rpe || "";
         document.getElementById('field-IdifEq').value = row.IdifEq || "";
         document.getElementById('scan-step').classList.add('hidden');
@@ -175,17 +136,20 @@
     function showScan() {
         document.getElementById('form-step').classList.add('hidden');
         document.getElementById('scan-step').classList.remove('hidden');
-        if (scanner && !scanner.getState() === 2) startScanner(); 
     }
 
     function downloadFinalCSV() {
-        if (csvData.length === 0) return;
         let csvRows = [];
+        // Hlavička v původním formátu (bez uvozovek, jak to má Illko)
         csvRows.push(csvHeaders.join(';'));
 
         csvData.forEach(row => {
             let values = csvHeaders.map(header => {
                 let val = row[header] === undefined || row[header] === null ? "" : String(row[header]);
+                
+                // OPRAVA: Illko chce uvozovky u textů, ale NE u čísel a dat
+                // Pokud hodnota obsahuje čárku, tečku (čísla) nebo je prázdná, nedáváme uvozovky
+                // Pokud je to text (obsahuje písmena), dáme uvozovky
                 if (val === "" || /^[0-9,.]+$/.test(val.replace('>', '')) || val.includes(':')) {
                     return val;
                 } else {
@@ -200,7 +164,7 @@
         const blob = new Blob([BOM + csvString], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
-        link.download = "export_illko_final.csv";
+        link.download = "export_illko_final_fix.csv";
         link.click();
     }
 
