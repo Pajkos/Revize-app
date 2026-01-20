@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Revizák Scan Pro – iOS FIX</title>
+    <title>Revizák Scan Pro – iOS Full Fix</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -11,13 +11,12 @@
         body { font-family: -apple-system, sans-serif; margin: 0; padding: 15px; background: #f4f4f9; -webkit-tap-highlight-color: transparent; }
         .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }
         label { display: block; margin-top: 10px; font-weight: bold; font-size: 0.9rem; color: #555; }
-        input, select { width: 100%; padding: 12px; margin: 5px 0 15px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
+        input, select { width: 100%; padding: 12px; margin: 5px 0 15px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1rem; -webkit-appearance: none; }
         button { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; color: white; }
         .btn-success { background: var(--success); }
         .btn-primary { background: var(--primary); }
         #reader { width: 100%; border-radius: 8px; overflow: hidden; background: #000; }
         .hidden { display: none; }
-        #loading-msg { color: var(--primary); font-weight: bold; padding: 10px; text-align: center; }
     </style>
 </head>
 <body>
@@ -25,9 +24,7 @@
 <div id="setup-step">
     <div class="card">
         <h2>1. Nahrát originál z Illka</h2>
-        <p style="font-size: 0.8rem; color: #666;">Pokud máte u souboru mráček, nejdříve na něj v aplikaci Soubory klikněte pro stažení.</p>
         <input type="file" id="csv-file" accept=".csv">
-        <div id="loading-msg" class="hidden">Zpracovávám soubor...</div>
     </div>
 </div>
 
@@ -48,11 +45,11 @@
         <p id="display-name"></p>
         <hr>
         <label>Rpe (Odpor ochranného vodiče)</label>
-        <input type="text" id="field-Rpe">
+        <input type="text" id="field-Rpe" inputmode="decimal">
         <label>IdifEq (Unikající proud)</label>
-        <input type="text" id="field-IdifEq">
+        <input type="text" id="field-IdifEq" inputmode="decimal">
         <label>RisoM_PE (Izolační odpor)</label>
-        <input type="text" id="field-Riso" value=">19,99">
+        <input type="text" id="field-Riso" value=">19,99" inputmode="text">
         <label>Výsledek</label>
         <select id="field-Result">
             <option value="Passed">Passed</option>
@@ -84,49 +81,38 @@
     document.getElementById('csv-file').onchange = function(e) {
         const file = e.target.files[0];
         if (!file) return;
-
-        document.getElementById('loading-msg').classList.remove('hidden');
-
         const reader = new FileReader();
         reader.onload = function(event) {
-            const text = event.target.result;
-            Papa.parse(text, {
-                header: true,
-                skipEmptyLines: false,
-                delimiter: ";",
+            Papa.parse(event.target.result, {
+                header: true, skipEmptyLines: false, delimiter: ";",
                 complete: function(results) {
-                    if (results.data && results.data.length > 0) {
-                        csvData = results.data;
-                        csvHeaders = results.meta.fields; 
-                        localStorage.setItem('revize_data', JSON.stringify(csvData));
-                        localStorage.setItem('revize_headers', JSON.stringify(csvHeaders));
-                        
-                        document.getElementById('setup-step').classList.add('hidden');
-                        document.getElementById('scan-step').classList.remove('hidden');
-                        location.reload(); 
-                    } else {
-                        alert("Soubor je prázdný nebo chybný.");
-                        document.getElementById('loading-msg').classList.add('hidden');
-                    }
+                    csvData = results.data;
+                    csvHeaders = results.meta.fields; 
+                    localStorage.setItem('revize_data', JSON.stringify(csvData));
+                    localStorage.setItem('revize_headers', JSON.stringify(csvHeaders));
+                    location.reload(); 
                 }
             });
         };
-        
-        // Zkusíme načíst s kódováním pro češtinu
         reader.readAsText(file, 'windows-1250');
     };
 
     function startScanner() {
-        if (document.getElementById('reader')) {
-            scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (t) => searchById(t))
-            .catch(err => console.log("Kamera se startuje..."));
-        }
+        scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (t) => {
+            // KLÍČOVÁ ZMĚNA: Po naskenování zastavíme skener, aby neblokoval UI
+            scanner.pause(true); 
+            searchById(t);
+        }).catch(err => console.log(err));
     }
 
     function searchById(id) {
         const idx = csvData.findIndex(r => String(r.IdText).trim() === String(id).trim());
-        if (idx !== -1) openForm(idx);
-        else alert("Nenalezeno: " + id);
+        if (idx !== -1) {
+            openForm(idx);
+        } else {
+            alert("Nenalezeno: " + id);
+            scanner.resume(); // Pokud se nenajde, skener zase spustíme
+        }
     }
 
     function openForm(idx) {
@@ -136,8 +122,14 @@
         document.getElementById('display-name').innerText = row.Name || "";
         document.getElementById('field-Rpe').value = row.Rpe || "";
         document.getElementById('field-IdifEq').value = row.IdifEq || "";
+        
         document.getElementById('scan-step').classList.add('hidden');
         document.getElementById('form-step').classList.remove('hidden');
+        
+        // Bonus: Automaticky klikne do prvního políčka, aby vyjela klávesnice
+        setTimeout(() => {
+            document.getElementById('field-Rpe').focus();
+        }, 300);
     }
 
     function saveData() {
@@ -162,11 +154,12 @@
     function showScan() {
         document.getElementById('form-step').classList.add('hidden');
         document.getElementById('scan-step').classList.remove('hidden');
+        // Opět spustíme skener
+        scanner.resume();
     }
 
     function downloadFinalCSV() {
-        let csvRows = [];
-        csvRows.push(csvHeaders.join(';'));
+        let csvRows = [csvHeaders.join(';')];
         csvData.forEach(row => {
             let values = csvHeaders.map(header => {
                 let val = row[header] === undefined || row[header] === null ? "" : String(row[header]);
@@ -178,9 +171,8 @@
             });
             csvRows.push(values.join(';'));
         });
-        let csvString = csvRows.join('\r\n');
         const BOM = "\uFEFF";
-        const blob = new Blob([BOM + csvString], { type: 'text/csv;charset=utf-8;' });
+        const blob = new Blob([BOM + csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
         link.download = "export_illko.csv";
@@ -188,10 +180,7 @@
     }
 
     function manualReset() {
-        if(confirm("Smazat vše a začít znovu?")) {
-            localStorage.clear();
-            location.reload();
-        }
+        if(confirm("Smazat vše?")) { localStorage.clear(); location.reload(); }
     }
 </script>
 </body>
