@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Revizák Scan Pro – iOS Full Fix</title>
+    <title>Revizák Scan Pro – AutoFill</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -61,6 +61,17 @@
 </div>
 
 <script>
+    // --- TADY SI ZMĚŇTE SVÉ ÚDAJE ---
+    const MOJE_UDAJE = {
+        TechName: "Pavel",
+        TechSurname: "Král",
+        TechLicence: "5288/25/R-EZ-E2A",
+        TechPhone: "732362287",
+        TechEmail: "pavel.kral96@seznam.cz",
+        DevName: "BENNING ST 710",
+        DevSerialNumber: "48N-0093"
+    };
+
     let csvData = [];
     let csvHeaders = [];
     let currentIndex = -1;
@@ -99,7 +110,6 @@
 
     function startScanner() {
         scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (t) => {
-            // KLÍČOVÁ ZMĚNA: Po naskenování zastavíme skener, aby neblokoval UI
             scanner.pause(true); 
             searchById(t);
         }).catch(err => console.log(err));
@@ -111,7 +121,7 @@
             openForm(idx);
         } else {
             alert("Nenalezeno: " + id);
-            scanner.resume(); // Pokud se nenajde, skener zase spustíme
+            scanner.resume();
         }
     }
 
@@ -122,14 +132,9 @@
         document.getElementById('display-name').innerText = row.Name || "";
         document.getElementById('field-Rpe').value = row.Rpe || "";
         document.getElementById('field-IdifEq').value = row.IdifEq || "";
-        
         document.getElementById('scan-step').classList.add('hidden');
         document.getElementById('form-step').classList.remove('hidden');
-        
-        // Bonus: Automaticky klikne do prvního políčka, aby vyjela klávesnice
-        setTimeout(() => {
-            document.getElementById('field-Rpe').focus();
-        }, 300);
+        setTimeout(() => { document.getElementById('field-Rpe').focus(); }, 300);
     }
 
     function saveData() {
@@ -137,6 +142,7 @@
         const now = new Date();
         const dateStr = now.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00";
         
+        // Základní data revize
         row.LastRev = dateStr;
         row.Date = dateStr;
         row.Time = "00:00:00";
@@ -147,6 +153,15 @@
         row.Result = res;
         row.ResultTotal = res;
 
+        // AUTOMATICKÉ PŘEPSÁNÍ ÚDAJŮ TECHNIKA A MĚŘÁKU
+        row.TechName = MOJE_UDAJE.TechName;
+        row.TechSurname = MOJE_UDAJE.TechSurname;
+        row.TechLicence = MOJE_UDAJE.TechLicence;
+        row.TechPhone = MOJE_UDAJE.TechPhone;
+        row.TechEmail = MOJE_UDAJE.TechEmail;
+        row.DevName = MOJE_UDAJE.DevName;
+        row.DevSerialNumber = MOJE_UDAJE.DevSerialNumber;
+
         localStorage.setItem('revize_data', JSON.stringify(csvData));
         showScan();
     }
@@ -154,7 +169,6 @@
     function showScan() {
         document.getElementById('form-step').classList.add('hidden');
         document.getElementById('scan-step').classList.remove('hidden');
-        // Opět spustíme skener
         scanner.resume();
     }
 
