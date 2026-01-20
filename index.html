@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Revizák Scan Pro – FINAL FIX</title>
+    <title>Revizák Scan Pro – ILLKO Compatibility Fix</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -81,7 +81,7 @@
     document.getElementById('csv-file').onchange = function(e) {
         Papa.parse(e.target.files[0], {
             header: true,
-            skipEmptyLines: false, // Důležité: Musíme zachovat i prázdné řádky pokud tam jsou
+            skipEmptyLines: false,
             delimiter: ";",
             complete: function(results) {
                 csvData = results.data;
@@ -139,30 +139,32 @@
     }
 
     function downloadFinalCSV() {
-        // Změna strategie: Ruční sestavení CSV, aby se předešlo chybám v unparse
         let csvRows = [];
-        
-        // Přidáme hlavičku
+        // Hlavička v původním formátu (bez uvozovek, jak to má Illko)
         csvRows.push(csvHeaders.join(';'));
 
-        // Přidáme data řádek po řádku
         csvData.forEach(row => {
             let values = csvHeaders.map(header => {
-                let val = row[header] === undefined || row[header] === null ? "" : row[header];
-                // Všechny hodnoty do uvozovek, aby Illko neblblo
-                return `"${val}"`;
+                let val = row[header] === undefined || row[header] === null ? "" : String(row[header]);
+                
+                // OPRAVA: Illko chce uvozovky u textů, ale NE u čísel a dat
+                // Pokud hodnota obsahuje čárku, tečku (čísla) nebo je prázdná, nedáváme uvozovky
+                // Pokud je to text (obsahuje písmena), dáme uvozovky
+                if (val === "" || /^[0-9,.]+$/.test(val.replace('>', '')) || val.includes(':')) {
+                    return val;
+                } else {
+                    return `"${val}"`;
+                }
             });
             csvRows.push(values.join(';'));
         });
 
-        // Spojíme řádky pomocí Windows koncovek \r\n
         let csvString = csvRows.join('\r\n');
-
         const BOM = "\uFEFF";
         const blob = new Blob([BOM + csvString], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
-        link.download = "export_illko_FINAL.csv";
+        link.download = "export_illko_final_fix.csv";
         link.click();
     }
 
