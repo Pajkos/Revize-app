@@ -25,6 +25,7 @@
     <div class="card">
         <h2>1. Nahrát originál z Illka</h2>
         <input type="file" id="csv-file" accept=".csv">
+        <p id="loading-msg" style="color: var(--primary); font-weight: bold; display: none;">Načítám data, moment...</p>
     </div>
 </div>
 
@@ -70,18 +71,26 @@
         const d = localStorage.getItem('revize_data');
         const h = localStorage.getItem('revize_headers');
         if (d && h) {
-            csvData = JSON.parse(d);
-            csvHeaders = JSON.parse(h);
-            document.getElementById('setup-step').classList.add('hidden');
-            document.getElementById('scan-step').classList.remove('hidden');
-            startScanner();
+            try {
+                csvData = JSON.parse(d);
+                csvHeaders = JSON.parse(h);
+                document.getElementById('setup-step').classList.add('hidden');
+                document.getElementById('scan-step').classList.remove('hidden');
+                startScanner();
+            } catch (e) {
+                console.error("Chyba při načítání paměti, resetuji...");
+                localStorage.clear();
+            }
         }
     };
 
     document.getElementById('csv-file').onchange = function(e) {
         const file = e.target.files[0];
-        const reader = new FileReader();
+        if (!file) return;
 
+        document.getElementById('loading-msg').style.display = 'block';
+
+        const reader = new FileReader();
         reader.onload = function(event) {
             const text = event.target.result;
             Papa.parse(text, {
@@ -89,20 +98,42 @@
                 skipEmptyLines: false,
                 delimiter: ";",
                 complete: function(results) {
-                    csvData = results.data;
-                    csvHeaders = results.meta.fields; 
-                    localStorage.setItem('revize_data', JSON.stringify(csvData));
-                    localStorage.setItem('revize_headers', JSON.stringify(csvHeaders));
-                    location.reload();
+                    if (results.data && results.data.length > 0) {
+                        csvData = results.data;
+                        csvHeaders = results.meta.fields; 
+                        localStorage.setItem('revize_data', JSON.stringify(csvData));
+                        localStorage.setItem('revize_headers', JSON.stringify(csvHeaders));
+                        
+                        // Okamžité přepnutí bez čekání na refresh
+                        document.getElementById('setup-step').classList.add('hidden');
+                        document.getElementById('scan-step').classList.remove('hidden');
+                        startScanner();
+                        location.reload(); // Pro jistotu čistého stavu
+                    } else {
+                        alert("Soubor se nepodařilo zpracovat. Je to správné CSV?");
+                        document.getElementById('loading-msg').style.display = 'none';
+                    }
+                },
+                error: function(err) {
+                    alert("Chyba při parsování CSV: " + err);
+                    document.getElementById('loading-msg').style.display = 'none';
                 }
             });
         };
-        // Oprava: Načtení souboru s českým kódováním
+
+        reader.onerror = function() {
+            alert("Chyba při čtení souboru z disku.");
+            document.getElementById('loading-msg').style.display = 'none';
+        };
+
         reader.readAsText(file, 'windows-1250');
     };
 
     function startScanner() {
-        scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (t) => searchById(t)).catch(() => {});
+        scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (t) => searchById(t))
+        .catch(err => {
+            console.log("Skener čeká na zapnutí kamery...");
+        });
     }
 
     function searchById(id) {
@@ -114,8 +145,8 @@
     function openForm(idx) {
         currentIndex = idx;
         const row = csvData[idx];
-        document.getElementById('display-id').innerText = row.IdText;
-        document.getElementById('display-name').innerText = row.Name;
+        document.getElementById('display-id').innerText = row.IdText || "---";
+        document.getElementById('display-name').innerText = row.Name || "---";
         document.getElementById('field-Rpe').value = row.Rpe || "";
         document.getElementById('field-IdifEq').value = row.IdifEq || "";
         document.getElementById('scan-step').classList.add('hidden');
@@ -144,16 +175,17 @@
     function showScan() {
         document.getElementById('form-step').classList.add('hidden');
         document.getElementById('scan-step').classList.remove('hidden');
+        if (scanner && !scanner.getState() === 2) startScanner(); 
     }
 
     function downloadFinalCSV() {
+        if (csvData.length === 0) return;
         let csvRows = [];
         csvRows.push(csvHeaders.join(';'));
 
         csvData.forEach(row => {
             let values = csvHeaders.map(header => {
                 let val = row[header] === undefined || row[header] === null ? "" : String(row[header]);
-                // Formátování: čísla bez uvozovek, texty s uvozovkami
                 if (val === "" || /^[0-9,.]+$/.test(val.replace('>', '')) || val.includes(':')) {
                     return val;
                 } else {
@@ -178,3 +210,6 @@
             location.reload();
         }
     }
+</script>
+</body>
+</html>
