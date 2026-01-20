@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Revizák Scan Pro – FIX</title>
+    <title>Revizák Scan Pro – FINAL FIX</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -47,7 +47,7 @@
         <label>Rpe (Odpor ochranného vodiče)</label>
         <input type="text" id="field-Rpe">
         <label>IdifEq (Unikající proud)</label>
-        <input type="text" id="text-IdifEq">
+        <input type="text" id="field-IdifEq">
         <label>RisoM_PE (Izolační odpor)</label>
         <input type="text" id="field-Riso" value=">19,99">
         <label>Výsledek</label>
@@ -81,7 +81,7 @@
     document.getElementById('csv-file').onchange = function(e) {
         Papa.parse(e.target.files[0], {
             header: true,
-            skipEmptyLines: true,
+            skipEmptyLines: false, // Důležité: Musíme zachovat i prázdné řádky pokud tam jsou
             delimiter: ";",
             complete: function(results) {
                 csvData = results.data;
@@ -109,7 +109,7 @@
         document.getElementById('display-id').innerText = row.IdText;
         document.getElementById('display-name').innerText = row.Name;
         document.getElementById('field-Rpe').value = row.Rpe || "";
-        document.getElementById('text-IdifEq').value = row.IdifEq || "";
+        document.getElementById('field-IdifEq').value = row.IdifEq || "";
         document.getElementById('scan-step').classList.add('hidden');
         document.getElementById('form-step').classList.remove('hidden');
     }
@@ -119,15 +119,15 @@
         const now = new Date();
         const dateStr = now.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00";
         
-        // Zápis hodnot (přesně do klíčů, které Illko zná)
         row.LastRev = dateStr;
         row.Date = dateStr;
         row.Time = "00:00:00";
         row.Rpe = document.getElementById('field-Rpe').value;
-        row.IdifEq = document.getElementById('text-IdifEq').value;
+        row.IdifEq = document.getElementById('field-IdifEq').value;
         row.RisoM_PE = document.getElementById('field-Riso').value;
-        row.Result = document.getElementById('field-Result').value;
-        row.ResultTotal = row.Result;
+        const res = document.getElementById('field-Result').value;
+        row.Result = res;
+        row.ResultTotal = res;
 
         localStorage.setItem('revize_data', JSON.stringify(csvData));
         showScan();
@@ -139,21 +139,30 @@
     }
 
     function downloadFinalCSV() {
-        // ZDE JE OPRAVA: Striktní unparse podle původní hlavičky
-        const csv = Papa.unparse({
-            fields: csvHeaders,
-            data: csvData
-        }, {
-            delimiter: ";",
-            quotes: true,
-            newline: "\r\n"
+        // Změna strategie: Ruční sestavení CSV, aby se předešlo chybám v unparse
+        let csvRows = [];
+        
+        // Přidáme hlavičku
+        csvRows.push(csvHeaders.join(';'));
+
+        // Přidáme data řádek po řádku
+        csvData.forEach(row => {
+            let values = csvHeaders.map(header => {
+                let val = row[header] === undefined || row[header] === null ? "" : row[header];
+                // Všechny hodnoty do uvozovek, aby Illko neblblo
+                return `"${val}"`;
+            });
+            csvRows.push(values.join(';'));
         });
 
+        // Spojíme řádky pomocí Windows koncovek \r\n
+        let csvString = csvRows.join('\r\n');
+
         const BOM = "\uFEFF";
-        const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+        const blob = new Blob([BOM + csvString], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
-        link.download = "export_pro_illko.csv";
+        link.download = "export_illko_FINAL.csv";
         link.click();
     }
 
