@@ -17,10 +17,7 @@
         .btn-primary { background: var(--primary); }
         .btn-danger { background: var(--danger); }
         .btn-outline { background: none; color: #666; border: 1px solid #ccc; }
-        
-        /* Zmenšený skener */
         #reader { width: 100%; max-width: 300px; margin: 15px auto; border-radius: 12px; overflow: hidden; background: #000; border: 2px solid #ddd; }
-        
         .hidden { display: none; }
         .flex-row { display: flex; gap: 10px; }
         .id-error { border: 2px solid var(--danger) !important; color: var(--danger); }
@@ -56,9 +53,9 @@
         <p id="display-name" style="font-weight:bold; margin-top:-10px; color:#333;"></p>
         <hr>
         <label>Rpe (Odpor ochranného vodiče)</label>
-        <input type="text" id="field-Rpe" inputmode="decimal" placeholder="např. 0,05">
+        <input type="text" id="field-Rpe" inputmode="decimal">
         <label>IdifEq (Unikající proud)</label>
-        <input type="text" id="field-IdifEq" inputmode="decimal" placeholder="např. 0,12">
+        <input type="text" id="field-IdifEq" inputmode="decimal">
         <label>RisoM_PE (Izolační odpor)</label>
         <input type="text" id="field-Riso" value=">19,99">
         
@@ -66,17 +63,17 @@
             <button class="btn-danger" style="flex: 1;" onclick="saveData(true)">KO (Závada)</button>
             <button class="btn-success" style="flex: 2;" onclick="saveData(false)">ULOŽIT OK</button>
         </div>
-        <button class="btn-outline" onclick="showScan()">ZPĚT BEZ ULOŽENÍ</button>
+        <button class="btn-outline" onclick="showScan()">ZPĚT</button>
     </div>
 </div>
 
 <div id="add-modal" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:1000; overflow-y:auto; padding:15px; box-sizing:border-box;">
     <div class="card">
-        <h3 style="margin-top:0;">Nový spotřebič</h3>
+        <h3>Nový spotřebič</h3>
         <label>ID Číslo (IdText)</label>
         <input type="text" id="new-IdText" oninput="validateNewId(this.value)">
         <label>Název spotřebiče</label>
-        <input type="text" id="new-Name" placeholder="např. Prodlužka 3m">
+        <input type="text" id="new-Name">
         <label>Kategorie</label>
         <select id="new-Category">
             <option>ČSN 33 1600 ed.2 - Spotřebiče</option>
@@ -97,27 +94,15 @@
             <option>Trvalé připojení 3 x 400V</option>
         </select>
         <div class="flex-row">
-            <div style="flex:1">
-                <label>Třída</label>
-                <select id="new-MeasClass"><option>I</option><option>II</option><option>III</option></select>
-            </div>
-            <div style="flex:1">
-                <label>Skupina</label>
-                <select id="new-MeasGroup"><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option></select>
-            </div>
+            <div style="flex:1"><label>Třída</label><select id="new-MeasClass"><option>I</option><option>II</option><option>III</option></select></div>
+            <div style="flex:1"><label>Skupina</label><select id="new-MeasGroup"><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option></select></div>
         </div>
         <div class="flex-row">
-            <div style="flex:1">
-                <label>Délka (m)</label>
-                <input type="number" id="new-CableLen" value="1.5">
-            </div>
-            <div style="flex:1">
-                <label>Interval (měs)</label>
-                <input type="number" id="new-Interval" value="24">
-            </div>
+            <div style="flex:1"><label>Délka (m)</label><input type="text" id="new-CableLen" value="1,5"></div>
+            <div style="flex:1"><label>Interval (měs)</label><input type="text" id="new-Interval" value="24"></div>
         </div>
         <label>Místnost (Tree1)</label>
-        <input type="text" id="new-Tree1" placeholder="např. Dílna">
+        <input type="text" id="new-Tree1">
         
         <button class="btn-success" onclick="addNewItem()">ULOŽIT NOVÝ</button>
         <button class="btn-outline" onclick="closeAddModal()">ZRUŠIT</button>
@@ -175,13 +160,13 @@
         scanner.start({ facingMode: "environment" }, { fps: 15, qrbox: 200 }, (t) => {
             scanner.pause(true); 
             searchById(t);
-        }).catch(err => console.log("Chyba kamery: ", err));
+        }).catch(err => console.log(err));
     }
 
     function searchById(id) {
         const idx = csvData.findIndex(r => String(r.IdText).trim() === String(id).trim());
         if (idx !== -1) openForm(idx);
-        else { alert("ID " + id + " nebylo v databázi nalezeno."); if(scanner.getState() === 3) scanner.resume(); }
+        else { alert("ID " + id + " nenalezeno."); if(scanner.getState() === 3) scanner.resume(); }
     }
 
     function openForm(idx) {
@@ -193,7 +178,6 @@
         document.getElementById('field-IdifEq').value = row.IdifEq || "";
         document.getElementById('scan-step').classList.add('hidden');
         document.getElementById('form-step').classList.remove('hidden');
-        setTimeout(() => { document.getElementById('field-Rpe').focus(); }, 300);
     }
 
     function saveData(isFailed) {
@@ -205,37 +189,27 @@
         row.LastRev = dateStr;
         row.Date = dateStr;
         row.Time = now.toLocaleTimeString('cs-CZ');
-        row.Rpe = document.getElementById('field-Rpe').value;
-        row.IdifEq = document.getElementById('field-IdifEq').value;
-        row.RisoM_PE = document.getElementById('field-Riso').value;
+        row.Rpe = document.getElementById('field-Rpe').value.replace('.', ',');
+        row.IdifEq = document.getElementById('field-IdifEq').value.replace('.', ',');
+        row.RisoM_PE = document.getElementById('field-Riso').value.replace('.', ',');
 
         if (isFailed) {
-            const reason = prompt("Zadejte POPIS ZÁVADY (MeasNote):");
-            row.Result = "Failed";
-            row.ResultTotal = "Failed";
-            row.ResultVisual = "Failed";
-            row.ResultFunct = "Failed";
-            row.ResultMeas = "Failed";
+            const reason = prompt("Důvod závady (MeasNote):");
+            row.Result = "Failed"; row.ResultTotal = "Failed"; row.ResultVisual = "Failed";
+            row.ResultFunct = "Failed"; row.ResultMeas = "Failed";
             row.MeasNote = reason || "Nevyhovuje";
-            row.Note = reason || "Nevyhovuje";
         } else {
-            row.Result = "Passed";
-            row.ResultTotal = "Passed";
-            row.ResultVisual = "Passed";
-            row.ResultFunct = "Passed";
-            row.ResultMeas = "Passed";
+            row.Result = "Passed"; row.ResultTotal = "Passed"; row.ResultVisual = "Passed";
+            row.ResultFunct = "Passed"; row.ResultMeas = "Passed";
             row.MeasNote = "";
-            row.Note = "";
         }
 
         Object.assign(row, MOJE_UDAJE);
-        
         if(row.Interval) {
             let next = new Date();
             next.setMonth(next.getMonth() + parseInt(row.Interval));
             row.NextRev = next.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00";
         }
-
         localStorage.setItem('revize_data', JSON.stringify(csvData));
         showScan();
     }
@@ -245,18 +219,16 @@
 
     function validateNewId(id) {
         const exists = csvData.some(r => String(r.IdText).trim() === String(id).trim());
-        const input = document.getElementById('new-IdText');
-        if (exists) input.classList.add('id-error');
-        else input.classList.remove('id-error');
+        document.getElementById('new-IdText').classList.toggle('id-error', exists);
     }
 
     function addNewItem() {
-        const id = document.getElementById('new-IdText').value;
-        if (csvData.some(r => String(r.IdText).trim() === String(id).trim())) return alert("Tento spotřebič již v seznamu existuje!");
+        const idInput = document.getElementById('new-IdText');
+        const id = idInput.value;
+        if (csvData.some(r => String(r.IdText).trim() === String(id).trim())) return alert("ID již existuje!");
         
         const newItem = {};
         csvHeaders.forEach(h => newItem[h] = "");
-        
         newItem.IdText = id;
         newItem.Name = document.getElementById('new-Name').value;
         newItem.Category = document.getElementById('new-Category').value;
@@ -264,15 +236,19 @@
         newItem.Connection = document.getElementById('new-Connection').value;
         newItem.MeasClass = document.getElementById('new-MeasClass').value;
         newItem.MeasGroup = document.getElementById('new-MeasGroup').value;
-        newItem.CableLen = document.getElementById('new-CableLen').value;
+        newItem.CableLen = document.getElementById('new-CableLen').value.replace('.', ',');
         newItem.Interval = document.getElementById('new-Interval').value;
         newItem.Tree1 = document.getElementById('new-Tree1').value;
         newItem._wasMeasured = false;
 
         csvData.push(newItem);
         localStorage.setItem('revize_data', JSON.stringify(csvData));
-        closeAddModal();
-        searchById(id);
+        
+        // VYČIŠTĚNÍ (ID zůstává, zbytek pryč)
+        document.getElementById('new-Name').value = "";
+        document.getElementById('new-Tree1').value = "";
+        
+        alert("Spotřebič " + id + " přidán. Můžete psát další.");
     }
 
     function showScan() {
@@ -283,32 +259,28 @@
 
     function downloadFinalCSV() {
         let csvRows = [csvHeaders.join(';')];
-        
-        // Seznam polí, která se mají smazat u nenalezených (měření)
-        const measurementFields = ["Rpe", "RisoM_PE", "IdifEq", "Rpe10A", "U10A", "IdifEqR", "IdifEqPE", "IdifEqPER", "IdifExt", "IdifTouch"];
+        const mFields = ["Rpe", "RisoM_PE", "IdifEq", "Rpe10A", "U10A", "IdifEqR", "IdifEqPE", "IdifEqPER", "IdifExt", "IdifTouch"];
 
         csvData.forEach(row => {
-            let finalRow = {...row};
-            
-            if (!finalRow._wasMeasured) {
-                // LOGIKA NENALEZENO
-                finalRow.LastRev = "01.01.1970 0:00:00";
-                finalRow.Date = "01.01.1970 0:00:00";
-                finalRow.Result = "Neprovedeno";
-                finalRow.ResultTotal = "Neprovedeno";
-                finalRow.Note = "Nenalezeno";
-                finalRow.MeasNote = "Nenalezeno";
-                // Smazání hodnot měření
-                measurementFields.forEach(f => { if(finalRow[f] !== undefined) finalRow[f] = ""; });
+            let fRow = {...row};
+            if (!fRow._wasMeasured) {
+                fRow.LastRev = "01.01.1970 0:00:00";
+                fRow.Date = "01.01.1970 0:00:00";
+                fRow.Result = "Neprovedeno"; fRow.ResultTotal = "Neprovedeno";
+                fRow.Note = "Nenalezeno"; fRow.MeasNote = "Nenalezeno";
+                mFields.forEach(f => { if(fRow[f] !== undefined) fRow[f] = ""; });
             }
 
-            let values = csvHeaders.map(header => {
-                let val = finalRow[header] === undefined || finalRow[header] === null ? "" : String(finalRow[header]);
-                return (val === "" || /^[0-9,.]+$/.test(val.replace('>', '')) || val.includes(':')) ? val : `"${val}"`;
+            let values = csvHeaders.map(h => {
+                let v = fRow[h] === undefined || fRow[h] === null ? "" : String(fRow[h]);
+                if (h === "CableLen" || h === "Interval") {
+                    if (v === "" || v === "undefined") return "0";
+                    return v.replace('.', ',');
+                }
+                return (v === "" || /^[0-9,.]+$/.test(v.replace('>', '')) || v.includes(':')) ? v : `"${v}"`;
             });
             csvRows.push(values.join(';'));
         });
-        
         const BOM = "\uFEFF";
         const blob = new Blob([BOM + csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
@@ -317,9 +289,7 @@
         link.click();
     }
 
-    function manualReset() {
-        if(confirm("Opravdu smazat všechna data z paměti?")) { localStorage.clear(); location.reload(); }
-    }
+    function manualReset() { if(confirm("Smazat vše?")) { localStorage.clear(); location.reload(); } }
 </script>
 </body>
 </html>
