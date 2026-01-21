@@ -7,16 +7,20 @@
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
-        :root { --primary: #007bff; --success: #28a745; --danger: #dc3545; }
+        :root { --primary: #007bff; --success: #28a745; --danger: #dc3545; --dark: #333; }
         body { font-family: -apple-system, sans-serif; margin: 0; padding: 15px; background: #f4f4f9; -webkit-tap-highlight-color: transparent; }
         .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }
-        label { display: block; margin-top: 10px; font-weight: bold; font-size: 0.9rem; color: #555; }
-        input, select { width: 100%; padding: 12px; margin: 5px 0 15px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1rem; -webkit-appearance: none; }
-        button { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; color: white; }
+        label { display: block; margin-top: 10px; font-weight: bold; font-size: 0.85rem; color: #555; }
+        input, select { width: 100%; padding: 12px; margin: 5px 0 10px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
+        button { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; color: white; margin-bottom: 10px; }
         .btn-success { background: var(--success); }
         .btn-primary { background: var(--primary); }
-        #reader { width: 100%; border-radius: 8px; overflow: hidden; background: #000; }
+        .btn-danger { background: var(--danger); }
+        .btn-outline { background: none; color: #666; border: 1px solid #ccc; }
+        #reader { width: 100%; border-radius: 8px; overflow: hidden; background: #000; margin-bottom: 10px; }
         .hidden { display: none; }
+        .flex-row { display: flex; gap: 10px; }
+        .id-error { border: 2px solid var(--danger) !important; color: var(--danger); }
     </style>
 </head>
 <body>
@@ -30,38 +34,93 @@
 
 <div id="scan-step" class="hidden">
     <div class="card">
-        <h2>2. Skenovat / Hledat</h2>
+        <div style="display:flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin:0;">Skenovat</h2>
+            <button onclick="openAddModal()" style="width:auto; padding:8px 15px; margin:0;" class="btn-primary">+ Nový</button>
+        </div>
         <div id="reader"></div>
         <input type="text" id="manual-search" placeholder="IdText (např. 001)...">
         <button class="btn-primary" onclick="searchById(document.getElementById('manual-search').value)">Hledat ručně</button>
     </div>
-    <button onclick="downloadFinalCSV()" style="background:#333; margin-top:10px;">3. Exportovat pro ILLKO</button>
-    <button onclick="manualReset()" style="background:none; color:var(--danger); border: 1px solid var(--danger); margin-top:30px; padding: 10px; font-size: 0.8rem;">RESETOVAT APLIKACI</button>
+    <button onclick="downloadFinalCSV()" style="background:var(--dark);">3. Exportovat pro ILLKO</button>
+    <button onclick="manualReset()" class="btn-outline" style="color:var(--danger); border-color:var(--danger); margin-top:20px;">RESETOVAT APLIKACI</button>
 </div>
 
 <div id="form-step" class="hidden">
     <div class="card">
-        <h3>Položka: <span id="display-id" style="color:var(--primary)"></span></h3>
-        <p id="display-name"></p>
+        <h3>ID: <span id="display-id" style="color:var(--primary)"></span></h3>
+        <p id="display-name" style="font-weight:bold; margin-top:-10px;"></p>
         <hr>
         <label>Rpe (Odpor ochranného vodiče)</label>
         <input type="text" id="field-Rpe" inputmode="decimal">
         <label>IdifEq (Unikající proud)</label>
         <input type="text" id="field-IdifEq" inputmode="decimal">
         <label>RisoM_PE (Izolační odpor)</label>
-        <input type="text" id="field-Riso" value=">19,99" inputmode="text">
-        <label>Výsledek</label>
-        <select id="field-Result">
-            <option value="Passed">Passed</option>
-            <option value="Failed">Failed</option>
+        <input type="text" id="field-Riso" value=">19,99">
+        
+        <div class="flex-row" style="margin-top:20px;">
+            <button class="btn-success" onclick="saveData(false)">ULOŽIT OK</button>
+            <button class="btn-danger" style="width:80px;" onclick="saveData(true)">KO</button>
+        </div>
+        <button class="btn-outline" onclick="showScan()">ZPĚT</button>
+    </div>
+</div>
+
+<div id="add-modal" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:100; overflow-y:auto; padding:20px; box-sizing:border-box;">
+    <div class="card">
+        <h3>Nový spotřebič</h3>
+        <label>IdText (Číslo)</label>
+        <input type="text" id="new-IdText" oninput="validateNewId(this.value)">
+        <label>Název</label>
+        <input type="text" id="new-Name">
+        <label>Kategorie</label>
+        <select id="new-Category">
+            <option>ČSN 33 1600 ed.2 - Spotřebiče</option>
+            <option>ČSN EN 60974-4 ed.2 – Svářečky</option>
+            <option>ČSN EN 60204-1 ed.2 – El. zařízení strojů</option>
         </select>
-        <button class="btn-success" onclick="saveData()">ULOŽIT</button>
-        <button onclick="showScan()" style="margin-top:10px; background:none; color:#666;">ZPĚT</button>
+        <label>Typ (EquipType)</label>
+        <select id="new-EquipType">
+            <option>Nepřipevněný</option>
+            <option>Držený v ruce</option>
+            <option>Připevněný</option>
+        </select>
+        <label>Připojení (Connection)</label>
+        <select id="new-Connection">
+            <option>Vidlicí 230V</option>
+            <option>Vidlicí 3 x 400V</option>
+            <option>Trvalé připojení 230V</option>
+            <option>Trvalé připojení 3 x 400V</option>
+        </select>
+        <div class="flex-row">
+            <div style="flex:1">
+                <label>Třída (MeasClass)</label>
+                <select id="new-MeasClass"><option>I</option><option>II</option><option>III</option></select>
+            </div>
+            <div style="flex:1">
+                <label>Skupina (MeasGroup)</label>
+                <select id="new-MeasGroup"><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option></select>
+            </div>
+        </div>
+        <div class="flex-row">
+            <div style="flex:1">
+                <label>Délka kabelu</label>
+                <input type="number" id="new-CableLen" value="1.5">
+            </div>
+            <div style="flex:1">
+                <label>Interval (měsíce)</label>
+                <input type="number" id="new-Interval" value="24">
+            </div>
+        </div>
+        <label>Místnost (Tree1)</label>
+        <input type="text" id="new-Tree1" placeholder="Např. Kancelář">
+        
+        <button class="btn-success" id="btn-save-new" onclick="addNewItem()">PŘIDAT</button>
+        <button class="btn-outline" onclick="closeAddModal()">ZRUŠIT</button>
     </div>
 </div>
 
 <script>
-    // --- TADY SI ZMĚŇTE SVÉ ÚDAJE ---
     const MOJE_UDAJE = {
         TechName: "Pavel",
         TechSurname: "Král",
@@ -97,7 +156,7 @@
             Papa.parse(event.target.result, {
                 header: true, skipEmptyLines: false, delimiter: ";",
                 complete: function(results) {
-                    csvData = results.data;
+                    csvData = results.data.map(row => ({...row, _wasMeasured: false}));
                     csvHeaders = results.meta.fields; 
                     localStorage.setItem('revize_data', JSON.stringify(csvData));
                     localStorage.setItem('revize_headers', JSON.stringify(csvHeaders));
@@ -117,12 +176,8 @@
 
     function searchById(id) {
         const idx = csvData.findIndex(r => String(r.IdText).trim() === String(id).trim());
-        if (idx !== -1) {
-            openForm(idx);
-        } else {
-            alert("Nenalezeno: " + id);
-            scanner.resume();
-        }
+        if (idx !== -1) openForm(idx);
+        else { alert("Nenalezeno: " + id); if(scanner.getState() === 3) scanner.resume(); }
     }
 
     function openForm(idx) {
@@ -137,51 +192,108 @@
         setTimeout(() => { document.getElementById('field-Rpe').focus(); }, 300);
     }
 
-    function saveData() {
+    function saveData(isFailed) {
         const row = csvData[currentIndex];
         const now = new Date();
         const dateStr = now.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00";
         
-        // Základní data revize
+        row._wasMeasured = true;
         row.LastRev = dateStr;
         row.Date = dateStr;
-        row.Time = "00:00:00";
+        row.Time = now.toLocaleTimeString('cs-CZ');
         row.Rpe = document.getElementById('field-Rpe').value;
         row.IdifEq = document.getElementById('field-IdifEq').value;
         row.RisoM_PE = document.getElementById('field-Riso').value;
-        const res = document.getElementById('field-Result').value;
-        row.Result = res;
-        row.ResultTotal = res;
 
-        // AUTOMATICKÉ PŘEPSÁNÍ ÚDAJŮ TECHNIKA A MĚŘÁKU
-        row.TechName = MOJE_UDAJE.TechName;
-        row.TechSurname = MOJE_UDAJE.TechSurname;
-        row.TechLicence = MOJE_UDAJE.TechLicence;
-        row.TechPhone = MOJE_UDAJE.TechPhone;
-        row.TechEmail = MOJE_UDAJE.TechEmail;
-        row.DevName = MOJE_UDAJE.DevName;
-        row.DevSerialNumber = MOJE_UDAJE.DevSerialNumber;
+        if (isFailed) {
+            const reason = prompt("Důvod nevyhovujícího stavu (MeasNote):");
+            row.Result = "Failed";
+            row.ResultTotal = "Failed";
+            row.ResultVisual = "Failed";
+            row.ResultFunct = "Failed";
+            row.ResultMeas = "Failed";
+            row.Note = reason || "Nevyhovuje";
+        } else {
+            row.Result = "Passed";
+            row.ResultTotal = "Passed";
+            row.ResultVisual = "Passed";
+            row.ResultFunct = "Passed";
+            row.ResultMeas = "Passed";
+            row.Note = "";
+        }
+
+        Object.assign(row, MOJE_UDAJE);
+        
+        // Výpočet příští revize
+        if(row.Interval) {
+            let next = new Date();
+            next.setMonth(next.getMonth() + parseInt(row.Interval));
+            row.NextRev = next.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00";
+        }
 
         localStorage.setItem('revize_data', JSON.stringify(csvData));
         showScan();
     }
 
+    // MODAL FUNKCE
+    function openAddModal() { document.getElementById('add-modal').classList.remove('hidden'); }
+    function closeAddModal() { document.getElementById('add-modal').classList.add('hidden'); }
+
+    function validateNewId(id) {
+        const exists = csvData.some(r => String(r.IdText).trim() === String(id).trim());
+        const input = document.getElementById('new-IdText');
+        if (exists) input.classList.add('id-error');
+        else input.classList.remove('id-error');
+    }
+
+    function addNewItem() {
+        const id = document.getElementById('new-IdText').value;
+        if (csvData.some(r => String(r.IdText).trim() === String(id).trim())) return alert("ID již existuje!");
+        
+        const newItem = {};
+        csvHeaders.forEach(h => newItem[h] = "");
+        
+        newItem.IdText = id;
+        newItem.Name = document.getElementById('new-Name').value;
+        newItem.Category = document.getElementById('new-Category').value;
+        newItem.EquipType = document.getElementById('new-EquipType').value;
+        newItem.Connection = document.getElementById('new-Connection').value;
+        newItem.MeasClass = document.getElementById('new-MeasClass').value;
+        newItem.MeasGroup = document.getElementById('new-MeasGroup').value;
+        newItem.CableLen = document.getElementById('new-CableLen').value;
+        newItem.Interval = document.getElementById('new-Interval').value;
+        newItem.Tree1 = document.getElementById('new-Tree1').value;
+        newItem._wasMeasured = false;
+
+        csvData.push(newItem);
+        localStorage.setItem('revize_data', JSON.stringify(csvData));
+        closeAddModal();
+        searchById(id);
+    }
+
     function showScan() {
         document.getElementById('form-step').classList.add('hidden');
         document.getElementById('scan-step').classList.remove('hidden');
-        scanner.resume();
+        if(scanner.getState() === 3) scanner.resume();
     }
 
     function downloadFinalCSV() {
         let csvRows = [csvHeaders.join(';')];
         csvData.forEach(row => {
+            let finalRow = {...row};
+            
+            // LOGIKA NENALEZENO
+            if (!finalRow._wasMeasured) {
+                finalRow.LastRev = "01.01.1970 0:00:00";
+                finalRow.Date = "01.01.1970 0:00:00";
+                finalRow.Result = "";
+                finalRow.ResultTotal = "";
+                finalRow.Note = "Nenalezeno";
+            }
+
             let values = csvHeaders.map(header => {
-                let val = row[header] === undefined || row[header] === null ? "" : String(row[header]);
-                if (val === "" || /^[0-9,.]+$/.test(val.replace('>', '')) || val.includes(':')) {
-                    return val;
-                } else {
-                    return `"${val}"`;
-                }
+                let val = finalRow[header] === undefined || finalRow[header] === null ? "" : String(finalRow[header]);
+                return (val === "" || /^[0-9,.]+$/.test(val.replace('>', '')) || val.includes(':')) ? val : `"${val}"`;
             });
             csvRows.push(values.join(';'));
         });
@@ -189,12 +301,12 @@
         const blob = new Blob([BOM + csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
-        link.download = "export_illko.csv";
+        link.download = "export_illko_final.csv";
         link.click();
     }
 
     function manualReset() {
-        if(confirm("Smazat vše?")) { localStorage.clear(); location.reload(); }
+        if(confirm("Smazat všechna data a začít znovu?")) { localStorage.clear(); location.reload(); }
     }
 </script>
 </body>
