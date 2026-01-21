@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Revizák Scan Pro – AutoFill</title>
+    <title>Revizák Scan Pro – Finální Verze</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -143,9 +143,9 @@
         const reader = new FileReader();
         reader.onload = function(event) {
             Papa.parse(event.target.result, {
-                header: true, skipEmptyLines: false, delimiter: ";",
+                header: true, skipEmptyLines: true, delimiter: ";",
                 complete: function(results) {
-                    csvData = results.data.map(row => ({...row, _wasMeasured: false}));
+                    csvData = results.data.filter(r => r.IdText && r.IdText.trim() !== "").map(row => ({...row, _wasMeasured: false}));
                     csvHeaders = results.meta.fields; 
                     localStorage.setItem('revize_data', JSON.stringify(csvData));
                     localStorage.setItem('revize_headers', JSON.stringify(csvHeaders));
@@ -243,12 +243,9 @@
 
         csvData.push(newItem);
         localStorage.setItem('revize_data', JSON.stringify(csvData));
-        
-        // VYČIŠTĚNÍ (ID zůstává, zbytek pryč)
         document.getElementById('new-Name').value = "";
         document.getElementById('new-Tree1').value = "";
-        
-        alert("Spotřebič " + id + " přidán. Můžete psát další.");
+        alert("Spotřebič " + id + " přidán.");
     }
 
     function showScan() {
@@ -259,16 +256,23 @@
 
     function downloadFinalCSV() {
         let csvRows = [csvHeaders.join(';')];
-        const mFields = ["Rpe", "RisoM_PE", "IdifEq", "Rpe10A", "U10A", "IdifEqR", "IdifEqPE", "IdifEqPER", "IdifExt", "IdifTouch"];
+        // Úplný seznam technických polí měření k vyčištění
+        const allMeasCols = ["Rpe","Rpe10A","U10A","IdifEq","IdifEqR","IdifEqPE","IdifEqPER","IdifExt","IdifTouch","IdifTouchR","IdirEq","IdirEqR","IdirEqPE","IdirEqPER","IdirExt","IdirTouch","IdirTouchR","IdirPat","IdirPatR","IdirPatB","IdirW","IdirWR","IaltEq","IaltEqPE","IaltPat","RisoM_PE","RisoAP_PE","RisoM_AP","RisoM_PE250","RisoAP_PE250","RisoM_AP250"];
 
         csvData.forEach(row => {
+            if (!row.IdText || row.IdText.trim() === "") return; // Ignorovat prázdné ID
+            
             let fRow = {...row};
             if (!fRow._wasMeasured) {
                 fRow.LastRev = "01.01.1970 0:00:00";
                 fRow.Date = "01.01.1970 0:00:00";
-                fRow.Result = "Neprovedeno"; fRow.ResultTotal = "Neprovedeno";
-                fRow.Note = "Nenalezeno"; fRow.MeasNote = "Nenalezeno";
-                mFields.forEach(f => { if(fRow[f] !== undefined) fRow[f] = ""; });
+                fRow.Result = "Neprovedeno"; 
+                fRow.ResultTotal = "Neprovedeno";
+                fRow.ResultVisual = ""; fRow.ResultFunct = ""; fRow.ResultMeas = "";
+                fRow.Note = "Nenalezeno"; 
+                fRow.MeasNote = "Nenalezeno";
+                // Totální vyčištění všech sloupců měření
+                allMeasCols.forEach(c => { if(fRow[c] !== undefined) fRow[c] = ""; });
             }
 
             let values = csvHeaders.map(h => {
