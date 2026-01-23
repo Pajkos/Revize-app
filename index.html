@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Revizák Scan Pro – Finální Verze</title>
+    <title>Revizák Scan Pro – v2.1</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -40,6 +40,7 @@
     </div>
     <div class="card" style="text-align: center;">
         <div id="reader"></div>
+        <button onclick="restartScanner()" class="btn-outline" style="padding: 8px; font-size: 0.8rem; width: auto; margin-bottom: 15px;">🔄 Restartovat kameru</button>
         <input type="text" id="manual-search" placeholder="Zadejte ID ručně...">
         <button class="btn-primary" onclick="searchById(document.getElementById('manual-search').value)">Hledat</button>
     </div>
@@ -81,18 +82,9 @@
             <option>ČSN EN 60204-1 ed.2 – El. zařízení strojů</option>
         </select>
         <label>Typ (EquipType)</label>
-        <select id="new-EquipType">
-            <option>Nepřipevněný</option>
-            <option>Držený v ruce</option>
-            <option>Připevněný</option>
-        </select>
+        <select id="new-EquipType"><option>Nepřipevněný</option><option>Držený v ruce</option><option>Připevněný</option></select>
         <label>Připojení (Connection)</label>
-        <select id="new-Connection">
-            <option>Vidlicí 230V</option>
-            <option>Vidlicí 3 x 400V</option>
-            <option>Trvalé připojení 230V</option>
-            <option>Trvalé připojení 3 x 400V</option>
-        </select>
+        <select id="new-Connection"><option>Vidlicí 230V</option><option>Vidlicí 3 x 400V</option><option>Trvalé připojení 230V</option><option>Trvalé připojení 3 x 400V</option></select>
         <div class="flex-row">
             <div style="flex:1"><label>Třída</label><select id="new-MeasClass"><option>I</option><option>II</option><option>III</option></select></div>
             <div style="flex:1"><label>Skupina</label><select id="new-MeasGroup"><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option></select></div>
@@ -101,9 +93,7 @@
             <div style="flex:1"><label>Délka (m)</label><input type="text" id="new-CableLen" value="1,5"></div>
             <div style="flex:1"><label>Interval (měs)</label><input type="text" id="new-Interval" value="24"></div>
         </div>
-        <label>Místnost (Tree1)</label>
-        <input type="text" id="new-Tree1">
-        
+        <label>Místnost (Tree1)</label><input type="text" id="new-Tree1">
         <button class="btn-success" onclick="addNewItem()">ULOŽIT NOVÝ</button>
         <button class="btn-outline" onclick="closeAddModal()">ZRUŠIT</button>
     </div>
@@ -161,6 +151,10 @@
             scanner.pause(true); 
             searchById(t);
         }).catch(err => console.log(err));
+    }
+
+    function restartScanner() {
+        scanner.stop().then(() => { startScanner(); }).catch(() => { startScanner(); });
     }
 
     function searchById(id) {
@@ -223,8 +217,7 @@
     }
 
     function addNewItem() {
-        const idInput = document.getElementById('new-IdText');
-        const id = idInput.value;
+        const id = document.getElementById('new-IdText').value;
         if (csvData.some(r => String(r.IdText).trim() === String(id).trim())) return alert("ID již existuje!");
         
         const newItem = {};
@@ -256,22 +249,23 @@
 
     function downloadFinalCSV() {
         let csvRows = [csvHeaders.join(';')];
-        // Úplný seznam technických polí měření k vyčištění
         const allMeasCols = ["Rpe","Rpe10A","U10A","IdifEq","IdifEqR","IdifEqPE","IdifEqPER","IdifExt","IdifTouch","IdifTouchR","IdirEq","IdirEqR","IdirEqPE","IdirEqPER","IdirExt","IdirTouch","IdirTouchR","IdirPat","IdirPatR","IdirPatB","IdirW","IdirWR","IaltEq","IaltEqPE","IaltPat","RisoM_PE","RisoAP_PE","RisoM_AP","RisoM_PE250","RisoAP_PE250","RisoM_AP250"];
 
         csvData.forEach(row => {
-            if (!row.IdText || row.IdText.trim() === "") return; // Ignorovat prázdné ID
-            
+            if (!row.IdText) return;
             let fRow = {...row};
             if (!fRow._wasMeasured) {
+                // LOGIKA PRO NENALEZENO (Dle ID 9 ve vzoru)
                 fRow.LastRev = "01.01.1970 0:00:00";
                 fRow.Date = "01.01.1970 0:00:00";
                 fRow.Result = "Neprovedeno"; 
                 fRow.ResultTotal = "Neprovedeno";
-                fRow.ResultVisual = ""; fRow.ResultFunct = ""; fRow.ResultMeas = "";
+                // Zásadní změna: Tyto musí být prázdné, jinak to ILLKO bere jako chybu
+                fRow.ResultVisual = ""; 
+                fRow.ResultFunct = ""; 
+                fRow.ResultMeas = "";
                 fRow.Note = "Nenalezeno"; 
                 fRow.MeasNote = "Nenalezeno";
-                // Totální vyčištění všech sloupců měření
                 allMeasCols.forEach(c => { if(fRow[c] !== undefined) fRow[c] = ""; });
             }
 
