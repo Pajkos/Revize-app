@@ -271,10 +271,12 @@
 
     function downloadFinalCSV() {
         let csvRows = [csvHeaders.join(';')];
+        
+        // Seznam polí, která se u nenalezených položek VŽDY MAŽOU
         const fieldsToClear = [
             "AutoRev", "ResultTotal", "ResultVisual", "ResultFunct", "ResultMeas",
             "TechName", "TechSurname", "TechLicence", "TechPhone", "TechEmail",
-            "DevName", "DevSerialNumber", "Date", "Time",
+            "DevName", "DevSerialNumber", "Date", "Time", "MeasNote",
             "Rpe", "Rpe10A", "U10A", "IdifEq", "IdifEqR", "IdifEqPE", "IdifEqPER", "IdifExt", "IdifTouch", "IdifTouchR",
             "IdirEq", "IdirEqR", "IdirEqPE", "IdirEqPER", "IdirExt", "IdirTouch", "IdirTouchR", "IdirPat", "IdirPatR",
             "IdirPatB", "IdirW", "IdirWR", "IaltEq", "IaltEqPE", "IaltPat", "RisoM_PE", "RisoAP_PE", "RisoM_AP",
@@ -284,14 +286,18 @@
         csvData.forEach(row => {
             if (!row.IdText) return;
             let fRow = {...row};
+            
             if (!fRow._wasMeasured) {
+                // Nastavení požadovaných hodnot pro nenalezené
+                fRow.Result = "Failed";
                 fRow.LastRev = "01.01.1970 0:00:00";
                 fRow.Date = "01.01.1970 0:00:00";
-                fRow.Result = "Failed"; 
-                fRow.Note = "Nenalezeno"; 
-                fRow.MeasNote = "Nenalezeno";
-                // Vymazání úplně všeho ostatního
-                fieldsToClear.forEach(f => { if(f !== "Date") fRow[f] = ""; });
+                fRow.Note = "Nenalezeno";
+                
+                // Vymazání všeho ostatního (včetně MeasNote a Technika)
+                fieldsToClear.forEach(f => {
+                    if (f !== "Date") fRow[f] = "";
+                });
             }
 
             let values = csvHeaders.map(h => {
@@ -304,6 +310,7 @@
             });
             csvRows.push(values.join(';'));
         });
+        
         const BOM = "\uFEFF";
         const blob = new Blob([BOM + csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
