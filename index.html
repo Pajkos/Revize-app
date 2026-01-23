@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Revizák Scan Pro – v2.6 FINAL</title>
+    <title>Revizák Scan Pro – v2.8</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -12,6 +12,16 @@
         .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }
         label { display: block; margin-top: 10px; font-weight: bold; font-size: 0.85rem; color: #555; }
         input, select { width: 100%; padding: 12px; margin: 5px 0 10px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
+        
+        /* Hezké nahrávací tlačítko */
+        .btn-upload-custom { 
+            background: var(--primary); color: white; padding: 30px 20px; 
+            text-align: center; border-radius: 12px; font-weight: bold; 
+            cursor: pointer; border: 3px dashed rgba(255,255,255,0.4);
+            display: block; font-size: 1.2rem;
+        }
+        #csv-file { display: none; } /* Skryje ošklivý systémový vstup */
+
         button { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; color: white; margin-bottom: 10px; }
         .btn-success { background: var(--success); }
         .btn-primary { background: var(--primary); }
@@ -21,36 +31,38 @@
         .hidden { display: none; }
         .flex-row { display: flex; gap: 10px; }
         .id-error { border: 2px solid var(--danger) !important; color: var(--danger); }
-        .header-box { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
 <div id="setup-step">
-    <div class="card">
-        <h2>1. Nahrát originál z Illka</h2>
+    <div class="card" style="text-align: center; padding: 50px 20px;">
+        <h2 style="margin-top:0;">Revizák Scan Pro</h2>
+        <p style="color: #666; margin-bottom: 30px;">Nahrajte CSV export z ILLKA.</p>
+        <label for="csv-file" class="btn-upload-custom">📁 VYBRAT SOUBOR CSV</label>
         <input type="file" id="csv-file" accept=".csv">
+        <p id="file-status" style="margin-top:20px; color:var(--primary); font-weight:bold;"></p>
     </div>
 </div>
 
 <div id="scan-step" class="hidden">
-    <div class="header-box">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
         <h2 style="margin:0;">Skenovat</h2>
-        <button onclick="openAddModal()" style="width:auto; padding:10px 20px; margin:0;" class="btn-primary">+ Nový spotřebič</button>
+        <button onclick="openAddModal()" style="width:auto; padding:10px 20px; margin:0;" class="btn-primary">+ Nový</button>
     </div>
     <div class="card" style="text-align: center;">
         <div id="reader"></div>
-        <button onclick="restartScanner()" class="btn-outline" style="padding: 8px; font-size: 0.8rem; width: auto; margin-bottom: 15px;">🔄 Restartovat kameru</button>
+        <button onclick="restartScanner()" class="btn-outline" style="padding: 8px; font-size: 0.8rem; width: auto; margin-bottom: 15px;">🔄 Restart kamery</button>
         <input type="text" id="manual-search" placeholder="Zadejte ID ručně...">
         <button class="btn-primary" onclick="searchById(document.getElementById('manual-search').value)">Hledat</button>
     </div>
     <button onclick="downloadFinalCSV()" style="background:var(--dark); height: 60px;">3. GENEROVAT EXPORT (CSV)</button>
-    <button onclick="manualReset()" class="btn-outline" style="color:var(--danger); border-color:var(--danger); margin-top:40px;">RESETOVAT DATA</button>
+    <button onclick="manualReset()" class="btn-outline" style="color:var(--danger); border-color:var(--danger); margin-top:40px; font-size: 0.8rem;">RESETOVAT DATA</button>
 </div>
 
 <div id="form-step" class="hidden">
     <div class="card">
-        <h3>ID: <span id="display-id" style="color:var(--primary)"></span> (<span id="display-class"></span>)</h3>
+        <h3>ID: <span id="display-id" style="color:var(--primary)"></span></h3>
         <p id="display-name" style="font-weight:bold; margin-top:-10px; color:#333;"></p>
         <hr>
         <label>Rpe (Odpor ochranného vodiče)</label>
@@ -63,7 +75,7 @@
         <input type="text" id="field-Riso" value=">19,99">
         
         <div class="flex-row" style="margin-top:20px;">
-            <button class="btn-danger" style="flex: 1;" onclick="saveData(true)">KO (Závada)</button>
+            <button class="btn-danger" style="flex: 1;" onclick="saveData(true)">KO</button>
             <button class="btn-success" style="flex: 2;" onclick="saveData(false)">ULOŽIT OK</button>
         </div>
         <button class="btn-outline" onclick="showScan()">ZPĚT</button>
@@ -85,11 +97,61 @@
         </select>
         <div class="flex-row">
             <div style="flex:1"><label>Třída</label><select id="new-MeasClass"><option>I</option><option>II</option><option>III</option></select></div>
-            <div style="flex:1"><label>Skupina</label><select id="new-MeasGroup"><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option></select></div>
+            <div style="flex:1"><label>Interval (měs)</label><input type="text" id="new-Interval" value="24"></div>
         </div>
-        <label>Typ (EquipType)</label>
-        <select id="new-EquipType"><option>Nepřipevněný</option><option>Držený v ruce</option><option>Připevněný</option></select>
-        <label>Připojení (Connection)</label>
-        <select id="new-Connection"><option>Vidlicí 230V</option><option>Vidlicí 3 x 400V</option><option>Trvalé připojení 230V</option><option>Trvalé připojení 3 x 400V</option></select>
-        <div class="flex-row">
-            <div style="flex:1"><label
+        <label>Místnost (Tree1)</label>
+        <input type="text" id="new-Tree1" list="room-list">
+        <datalist id="room-list"></datalist>
+        <button class="btn-success" onclick="addNewItem()">ULOŽIT A MĚŘIT</button>
+        <button class="btn-outline" onclick="closeAddModal()">ZRUŠIT</button>
+    </div>
+</div>
+
+<script>
+    const MOJE_UDAJE = {
+        TechName: "Pavel", TechSurname: "Král", TechLicence: "5288/25/R-EZ-E2A",
+        TechPhone: "732362287", TechEmail: "pavel.kral96@seznam.cz",
+        DevName: "BENNING ST 710", DevSerialNumber: "48N-0093"
+    };
+
+    let csvData = [];
+    let csvHeaders = [];
+    let currentIndex = -1;
+    let scanner = new Html5Qrcode("reader");
+
+    window.onload = () => {
+        const d = localStorage.getItem('revize_data');
+        const h = localStorage.getItem('revize_headers');
+        if (d && h) {
+            csvData = JSON.parse(d);
+            csvHeaders = JSON.parse(h);
+            updateRoomList();
+            document.getElementById('setup-step').classList.add('hidden');
+            document.getElementById('scan-step').classList.remove('hidden');
+            setTimeout(startScanner, 500);
+        }
+    };
+
+    function updateRoomList() {
+        const rooms = [...new Set(csvData.map(item => item.Tree1).filter(Boolean))];
+        const list = document.getElementById('room-list');
+        list.innerHTML = "";
+        rooms.forEach(room => {
+            const opt = document.createElement('option');
+            opt.value = room;
+            list.appendChild(opt);
+        });
+    }
+
+    // LOGIKA NAHRÁVÁNÍ SOUBORU
+    document.getElementById('csv-file').onchange = function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        document.getElementById('file-status').innerText = "Načítám: " + file.name + "...";
+        
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            Papa.parse(event.target.result, {
+                header: true, skipEmptyLines: true, delimiter: ";",
+                complete:
