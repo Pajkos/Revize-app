@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Revizák Scan Pro – v2.1</title>
+    <title>Revizák Scan Pro – v2.2</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -93,21 +93,20 @@
             <div style="flex:1"><label>Délka (m)</label><input type="text" id="new-CableLen" value="1,5"></div>
             <div style="flex:1"><label>Interval (měs)</label><input type="text" id="new-Interval" value="24"></div>
         </div>
-        <label>Místnost (Tree1)</label><input type="text" id="new-Tree1">
-        <button class="btn-success" onclick="addNewItem()">ULOŽIT NOVÝ</button>
+        <label>Místnost (Tree1)</label>
+        <input type="text" id="new-Tree1" list="room-list">
+        <datalist id="room-list"></datalist>
+        
+        <button class="btn-success" onclick="addNewItem()">ULOŽIT A MĚŘIT</button>
         <button class="btn-outline" onclick="closeAddModal()">ZRUŠIT</button>
     </div>
 </div>
 
 <script>
     const MOJE_UDAJE = {
-        TechName: "Pavel",
-        TechSurname: "Král",
-        TechLicence: "5288/25/R-EZ-E2A",
-        TechPhone: "732362287",
-        TechEmail: "pavel.kral96@seznam.cz",
-        DevName: "BENNING ST 710",
-        DevSerialNumber: "48N-0093"
+        TechName: "Pavel", TechSurname: "Král", TechLicence: "5288/25/R-EZ-E2A",
+        TechPhone: "732362287", TechEmail: "pavel.kral96@seznam.cz",
+        DevName: "BENNING ST 710", DevSerialNumber: "48N-0093"
     };
 
     let csvData = [];
@@ -121,11 +120,23 @@
         if (d && h) {
             csvData = JSON.parse(d);
             csvHeaders = JSON.parse(h);
+            updateRoomList();
             document.getElementById('setup-step').classList.add('hidden');
             document.getElementById('scan-step').classList.remove('hidden');
             setTimeout(startScanner, 500);
         }
     };
+
+    function updateRoomList() {
+        const rooms = [...new Set(csvData.map(item => item.Tree1).filter(Boolean))];
+        const list = document.getElementById('room-list');
+        list.innerHTML = "";
+        rooms.forEach(room => {
+            const opt = document.createElement('option');
+            opt.value = room;
+            list.appendChild(opt);
+        });
+    }
 
     document.getElementById('csv-file').onchange = function(e) {
         const file = e.target.files[0];
@@ -183,6 +194,7 @@
         row.LastRev = dateStr;
         row.Date = dateStr;
         row.Time = now.toLocaleTimeString('cs-CZ');
+        row.AutoRev = "True"; // Příznak, že měření proběhlo
         row.Rpe = document.getElementById('field-Rpe').value.replace('.', ',');
         row.IdifEq = document.getElementById('field-IdifEq').value.replace('.', ',');
         row.RisoM_PE = document.getElementById('field-Riso').value.replace('.', ',');
@@ -208,7 +220,7 @@
         showScan();
     }
 
-    function openAddModal() { document.getElementById('add-modal').classList.remove('hidden'); }
+    function openAddModal() { updateRoomList(); document.getElementById('add-modal').classList.remove('hidden'); }
     function closeAddModal() { document.getElementById('add-modal').classList.add('hidden'); }
 
     function validateNewId(id) {
@@ -218,6 +230,7 @@
 
     function addNewItem() {
         const id = document.getElementById('new-IdText').value;
+        if (!id) return alert("Zadejte ID!");
         if (csvData.some(r => String(r.IdText).trim() === String(id).trim())) return alert("ID již existuje!");
         
         const newItem = {};
@@ -236,9 +249,10 @@
 
         csvData.push(newItem);
         localStorage.setItem('revize_data', JSON.stringify(csvData));
-        document.getElementById('new-Name').value = "";
-        document.getElementById('new-Tree1').value = "";
-        alert("Spotřebič " + id + " přidán.");
+        
+        closeAddModal();
+        const newIdx = csvData.length - 1;
+        openForm(newIdx); // OKAMŽITÉ OTEVŘENÍ MĚŘENÍ
     }
 
     function showScan() {
@@ -249,24 +263,20 @@
 
     function downloadFinalCSV() {
         let csvRows = [csvHeaders.join(';')];
-        const allMeasCols = ["Rpe","Rpe10A","U10A","IdifEq","IdifEqR","IdifEqPE","IdifEqPER","IdifExt","IdifTouch","IdifTouchR","IdirEq","IdirEqR","IdirEqPE","IdirEqPER","IdirExt","IdirTouch","IdirTouchR","IdirPat","IdirPatR","IdirPatB","IdirW","IdirWR","IaltEq","IaltEqPE","IaltPat","RisoM_PE","RisoAP_PE","RisoM_AP","RisoM_PE250","RisoAP_PE250","RisoM_AP250"];
+        const allMeasCols = ["AutoRev","ResultVisual","ResultFunct","ResultMeas","Rpe","Rpe10A","U10A","IdifEq","IdifEqR","IdifEqPE","IdifEqPER","IdifExt","IdifTouch","IdifTouchR","IdirEq","IdirEqR","IdirEqPE","IdirEqPER","IdirExt","IdirTouch","IdirTouchR","IdirPat","IdirPatR","IdirPatB","IdirW","IdirWR","IaltEq","IaltEqPE","IaltPat","RisoM_PE","RisoAP_PE","RisoM_AP","RisoM_PE250","RisoAP_PE250","RisoM_AP250"];
 
         csvData.forEach(row => {
             if (!row.IdText) return;
             let fRow = {...row};
             if (!fRow._wasMeasured) {
-                // LOGIKA PRO NENALEZENO (Dle ID 9 ve vzoru)
                 fRow.LastRev = "01.01.1970 0:00:00";
                 fRow.Date = "01.01.1970 0:00:00";
                 fRow.Result = "Neprovedeno"; 
                 fRow.ResultTotal = "Neprovedeno";
-                // Zásadní změna: Tyto musí být prázdné, jinak to ILLKO bere jako chybu
-                fRow.ResultVisual = ""; 
-                fRow.ResultFunct = ""; 
-                fRow.ResultMeas = "";
                 fRow.Note = "Nenalezeno"; 
                 fRow.MeasNote = "Nenalezeno";
-                allMeasCols.forEach(c => { if(fRow[c] !== undefined) fRow[c] = ""; });
+                // Totální čistka polí pro ILLKO
+                allMeasCols.forEach(c => { fRow[c] = ""; });
             }
 
             let values = csvHeaders.map(h => {
