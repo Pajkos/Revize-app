@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Revizák Scan Pro – v3.2 STABLE</title>
+    <title>Revizák Scan Pro – v3.3</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -18,17 +18,15 @@
         .btn-outline { background: none; color: #666; border: 1px solid #ccc; }
         #reader { width: 100%; max-width: 300px; margin: 15px auto; border-radius: 12px; overflow: hidden; background: #000; }
         .hidden { display: none; }
-        .flex-row { display: flex; gap: 10px; }
     </style>
 </head>
 <body>
 
 <div id="setup-step">
-    <div class="card" style="text-align:center;">
-        <h2 style="color:var(--primary);">Nahrání dat</h2>
-        <p>Vyberte soubor <b>Testovaci soubor 005.csv</b></p>
-        <input type="file" id="csv-file" style="padding:20px; border:2px dashed #ccc; width:100%; border-radius:10px;">
-        <div id="load-error" style="color:var(--danger); margin-top:10px; font-weight:bold;"></div>
+    <div class="card">
+        <h2 style="text-align:center;">1. Vybrat soubor CSV</h2>
+        <input type="file" id="csv-file">
+        <p style="color: #666; font-size: 0.8rem; text-align: center;">(Aplikace se spustí ihned po výběru souboru)</p>
     </div>
 </div>
 
@@ -39,11 +37,11 @@
     </div>
     <div class="card" style="text-align: center;">
         <div id="reader"></div>
-        <input type="text" id="manual-search" placeholder="ID ručně..." style="margin-top:15px;">
+        <input type="text" id="manual-search" placeholder="Zadejte ID ručně..." style="margin-top:15px;">
         <button class="btn-primary" onclick="searchById(document.getElementById('manual-search').value)">HLEDAT</button>
     </div>
-    <button onclick="downloadFinalCSV()" style="background:var(--dark);">GENEROVAT EXPORT (CSV)</button>
-    <button onclick="manualReset()" class="btn-outline" style="color:var(--danger); margin-top:30px;">RESETOVAT VŠE</button>
+    <button onclick="downloadFinalCSV()" style="background:var(--dark); height: 60px;">2. GENEROVAT EXPORT (CSV)</button>
+    <button onclick="manualReset()" class="btn-outline" style="color:var(--danger); border-color:var(--danger); margin-top:30px;">RESETOVAT DATA</button>
 </div>
 
 <div id="form-step" class="hidden">
@@ -55,7 +53,7 @@
         <label>IdifEq (Proud PE)</label><input type="text" id="field-IdifEq" inputmode="decimal">
         <label>IdifTouch (Dotyk. proud)</label><input type="text" id="field-IdifTouch" inputmode="decimal">
         <label>Riso (Izolační odpor)</label><input type="text" id="field-Riso" value=">19,99">
-        <div class="flex-row" style="margin-top:20px;">
+        <div style="display:flex; gap:10px; margin-top:20px;">
             <button class="btn-danger" style="background:var(--danger); flex: 1;" onclick="saveData(true)">KO</button>
             <button class="btn-success" style="flex: 2;" onclick="saveData(false)">ULOŽIT OK</button>
         </div>
@@ -95,29 +93,31 @@
         }
     };
 
-    document.getElementById('csv-file').addEventListener('change', function(e) {
+    document.getElementById('csv-file').onchange = function(e) {
         const file = e.target.files[0];
         if (!file) return;
 
         const reader = new FileReader();
         reader.onload = function(event) {
+            // POUŽÍVÁME AUTO-DETEKCI ODDĚLOVAČE (čárka/středník)
             Papa.parse(event.target.result, {
-                header: true, skipEmptyLines: true, delimiter: ";",
+                header: true, 
+                skipEmptyLines: true,
                 complete: function(results) {
                     if (results.data.length > 0) {
                         csvData = results.data.map(r => ({...r, _wasMeasured: false}));
                         csvHeaders = results.meta.fields;
                         localStorage.setItem('revize_data', JSON.stringify(csvData));
                         localStorage.setItem('revize_headers', JSON.stringify(csvHeaders));
-                        startApp();
+                        location.reload(); 
                     } else {
-                        document.getElementById('load-error').innerText = "Soubor je prázdný nebo má špatný formát!";
+                        alert("Soubor se nepodařilo přečíst. Zkontrolujte formát.");
                     }
                 }
             });
         };
         reader.readAsText(file, 'windows-1250');
-    });
+    };
 
     function startApp() {
         document.getElementById('setup-step').classList.add('hidden');
@@ -167,18 +167,20 @@
     }
 
     function downloadFinalCSV() {
+        // POUŽIJEME STŘEDNÍK PRO EXPORT (ILLKO HO VYŽADUJE)
         let csvRows = [csvHeaders.join(';')];
-        const fieldsToClear = ["AutoRev","ResultTotal","ResultVisual","ResultFunct","ResultMeas","TechName","TechSurname","TechLicence","TechPhone","TechEmail","DevName","DevSerialNumber","Date","Time","MeasNote","Rpe","IdifEq","IdifTouch","RisoM_PE"];
+        const toClear = ["AutoRev","ResultTotal","ResultVisual","ResultFunct","ResultMeas","TechName","TechSurname","TechLicence","TechPhone","TechEmail","DevName","DevSerialNumber","Date","Time","MeasNote","Rpe","IdifEq","IdifTouch","RisoM_PE"];
 
         csvData.forEach(row => {
             let fRow = {...row};
             if (!fRow._wasMeasured) {
                 fRow.LastRev = "01.01.1970 0:00:00"; fRow.Date = "01.01.1970 0:00:00";
                 fRow.Result = "Failed"; fRow.Note = "Nenalezeno"; 
-                fieldsToClear.forEach(f => { if(f !== "Date") fRow[f] = ""; });
+                toClear.forEach(f => { if(f !== "Date") fRow[f] = ""; });
             }
             let values = csvHeaders.map(h => {
                 let v = fRow[h] || "";
+                // Obalit uvozovkami jen pokud to není číslo nebo čas
                 return (v === "" || /^[0-9,.]+$/.test(v.replace('>','')) || v.includes(':')) ? v : `"${v}"`;
             });
             csvRows.push(values.join(';'));
