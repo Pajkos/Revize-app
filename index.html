@@ -3,264 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Revizák Scan Pro – v2.9</title>
+    <title>Revizák Scan Pro – v3.0</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
         :root { --primary: #007bff; --success: #28a745; --danger: #dc3545; --dark: #333; }
-        body { font-family: -apple-system, sans-serif; margin: 0; padding: 15px; background: #f4f4f9; -webkit-tap-highlight-color: transparent; }
-        .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }
-        label { display: block; margin-top: 10px; font-weight: bold; font-size: 0.85rem; color: #555; }
-        input, select { width: 100%; padding: 12px; margin: 5px 0 10px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
+        body { font-family: -apple-system, sans-serif; margin: 0; padding: 15px; background: #f4f4f9; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 15px; }
         
-        /* Tlačítko pro nahrání */
-        .upload-area {
-            border: 3px dashed var(--primary);
-            padding: 40px 20px;
-            border-radius: 15px;
-            text-align: center;
-            background: rgba(0, 123, 255, 0.05);
-            cursor: pointer;
-        }
-        .upload-area h2 { color: var(--primary); margin: 0 0 10px 0; }
-        #csv-file { display: none; }
-
+        /* Nový styl nahrávání */
+        .upload-container { border: 3px dashed #ccc; padding: 30px; text-align: center; border-radius: 15px; transition: 0.3s; }
+        .upload-container.active { border-color: var(--primary); background: #e7f1ff; }
+        #csv-file { margin: 20px 0; font-size: 1rem; width: 100%; }
+        
         button { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; color: white; margin-bottom: 10px; }
-        .btn-success { background: var(--success); }
         .btn-primary { background: var(--primary); }
-        .btn-danger { background: var(--danger); }
-        .btn-outline { background: none; color: #666; border: 1px solid #ccc; }
-        #reader { width: 100%; max-width: 300px; margin: 15px auto; border-radius: 12px; overflow: hidden; background: #000; }
+        .btn-success { background: var(--success); }
+        .btn-outline { background: white; color: #666; border: 1px solid #ccc; }
         .hidden { display: none; }
-        .flex-row { display: flex; gap: 10px; }
+        #reader { width: 100%; max-width: 300px; margin: 0 auto; border-radius: 10px; overflow: hidden; }
+        label { display: block; margin-top: 10px; font-weight: bold; font-size: 0.8rem; }
+        input, select { width: 100%; padding: 12px; margin: 5px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
     </style>
 </head>
 <body>
 
 <div id="setup-step">
     <div class="card">
-        <div class="upload-area" onclick="document.getElementById('csv-file').click()">
-            <h2>📁 VYBRAT SOUBOR</h2>
-            <p>Klikněte pro nahrání CSV z ILLKA</p>
+        <h2 style="text-align:center; margin-top:0;">Revizák Scan Pro</h2>
+        <div class="upload-container" id="drop-zone">
+            <p>1. Vyberte soubor z ILLKA</p>
+            <input type="file" id="csv-file" accept=".csv">
+            <button class="btn-primary" onclick="handleManualLoad()">2. NAČÍST DATA</button>
         </div>
-        <input type="file" id="csv-file" accept=".csv">
-        <p id="file-info" style="text-align:center; margin-top:15px; color:var(--success); font-weight:bold;"></p>
+        <p id="status" style="text-align:center; font-weight:bold; margin-top:15px; color:var(--danger);"></p>
     </div>
 </div>
 
 <div id="scan-step" class="hidden">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
         <h2 style="margin:0;">Skenování</h2>
-        <button onclick="openAddModal()" style="width:auto; margin:0; padding:10px 20px;" class="btn-primary">+ Nový kus</button>
+        <button onclick="openAddModal()" style="width:auto; margin:0; padding:10px 15px;" class="btn-primary">+ Nový</button>
     </div>
     <div class="card" style="text-align:center;">
         <div id="reader"></div>
-        <button onclick="restartScanner()" class="btn-outline" style="width:auto; padding:8px 15px; margin:10px 0; font-size:0.8rem;">🔄 Restartovat kameru</button>
-        <input type="text" id="manual-search" placeholder="ID spotřebiče...">
-        <button class="btn-primary" onclick="searchById(document.getElementById('manual-search').value)">Hledat ručně</button>
+        <input type="text" id="manual-search" placeholder="ID kusu..." style="margin-top:15px;">
+        <button class="btn-primary" onclick="searchById(document.getElementById('manual-search').value)">HLEDAT RUČNĚ</button>
     </div>
-    <button onclick="downloadFinalCSV()" style="background:var(--dark); height:60px; margin-top:10px;">3. GENEROVAT EXPORT PRO ILLKO</button>
-    <button onclick="manualReset()" class="btn-outline" style="color:var(--danger); border-color:var(--danger); margin-top:30px; font-size:0.8rem;">SMAZAT DATA A ZAČÍT ZNOVU</button>
+    <button onclick="downloadFinalCSV()" style="background:var(--dark); height: 60px;">GENEROVAT EXPORT (CSV)</button>
+    <button onclick="manualReset()" class="btn-outline" style="color:var(--danger); margin-top:20px; border-color:var(--danger);">SMAZAT VŠE A RESETOVAT</button>
 </div>
 
 <div id="form-step" class="hidden">
     <div class="card">
-        <h3 id="form-title">ID: <span id="display-id"></span></h3>
-        <p id="display-name" style="font-weight:bold; margin-top:-10px;"></p>
+        <h3 style="margin-top:0;">ID: <span id="display-id" style="color:var(--primary)"></span></h3>
+        <p id="display-name" style="font-weight:bold;"></p>
         <hr>
-        <label>Rpe (Odpor ochranného vodiče)</label>
-        <input type="text" id="field-Rpe" inputmode="decimal">
-        <label>IdifEq (Proud PE)</label>
-        <input type="text" id="field-IdifEq" inputmode="decimal">
-        <label>IdifTouch (Dotykový proud)</label>
-        <input type="text" id="field-IdifTouch" inputmode="decimal">
-        <label>RisoM_PE (Izolační odpor)</label>
-        <input type="text" id="field-Riso" value=">19,99">
-        
-        <div class="flex-row" style="margin-top:20px;">
-            <button class="btn-danger" style="flex:1;" onclick="saveData(true)">KO (Závada)</button>
-            <button class="btn-success" style="flex:2;" onclick="saveData(false)">ULOŽIT (V pořádku)</button>
+        <label>Rpe (Odpor PE)</label><input type="text" id="field-Rpe" inputmode="decimal">
+        <label>IdifEq (Proud PE)</label><input type="text" id="field-IdifEq" inputmode="decimal">
+        <label>IdifTouch (Dotyk. proud)</label><input type="text" id="field-IdifTouch" inputmode="decimal">
+        <label>Riso (Izolační odpor)</label><input type="text" id="field-Riso" value=">19,99">
+        <div style="display:flex; gap:10px; margin-top:20px;">
+            <button class="btn-danger" style="background:var(--danger); flex:1;" onclick="saveData(true)">KO</button>
+            <button class="btn-success" style="flex:2;" onclick="saveData(false)">ULOŽIT OK</button>
         </div>
-        <button class="btn-outline" onclick="showScan()">ZPĚT NA SKENOVÁNÍ</button>
+        <button class="btn-outline" onclick="showScan()">ZPĚT</button>
     </div>
 </div>
 
-<div id="add-modal" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:9999; overflow-y:auto; padding:15px; box-sizing:border-box;">
-    <div class="card">
-        <h3>Přidat nový spotřebič</h3>
-        <label>ID Číslo (IdText)</label>
-        <input type="text" id="new-IdText">
-        <label>Název spotřebiče</label>
-        <input type="text" id="new-Name">
-        <div class="flex-row">
-            <div style="flex:1;"><label>Třída</label><select id="new-MeasClass"><option>I</option><option>II</option><option>III</option></select></div>
-            <div style="flex:1;"><label>Interval (měs)</label><input type="text" id="new-Interval" value="24"></div>
-        </div>
-        <label>Místnost</label>
-        <input type="text" id="new-Tree1" list="room-list">
-        <datalist id="room-list"></datalist>
-        <button class="btn-success" onclick="addNewItem()" style="margin-top:15px;">ULOŽIT A PŘEJÍT K MĚŘENÍ</button>
-        <button class="btn-outline" onclick="closeAddModal()">ZRUŠIT</button>
-    </div>
-</div>
-
-<script>
-    const MOJE_UDAJE = {
-        TechName: "Pavel", TechSurname: "Král", TechLicence: "5288/25/R-EZ-E2A",
-        TechPhone: "732362287", TechEmail: "pavel.kral96@seznam.cz",
-        DevName: "BENNING ST 710", DevSerialNumber: "48N-0093"
-    };
-
-    let csvData = [];
-    let csvHeaders = [];
-    let currentIndex = -1;
-    let scanner = new Html5Qrcode("reader");
-
-    // Načtení dat při startu
-    window.onload = () => {
-        const savedData = localStorage.getItem('revize_data');
-        const savedHeaders = localStorage.getItem('revize_headers');
-        if (savedData && savedHeaders) {
-            csvData = JSON.parse(savedData);
-            csvHeaders = JSON.parse(savedHeaders);
-            document.getElementById('setup-step').classList.add('hidden');
-            document.getElementById('scan-step').classList.remove('hidden');
-            updateRoomList();
-            setTimeout(startScanner, 500);
-        }
-    };
-
-    // Obsluha nahrání souboru
-    document.getElementById('csv-file').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            Papa.parse(event.target.result, {
-                header: true, skipEmptyLines: true, delimiter: ";",
-                complete: function(results) {
-                    csvData = results.data.filter(r => r.IdText).map(row => ({...row, _wasMeasured: false}));
-                    csvHeaders = results.meta.fields;
-                    localStorage.setItem('revize_data', JSON.stringify(csvData));
-                    localStorage.setItem('revize_headers', JSON.stringify(csvHeaders));
-                    location.reload();
-                }
-            });
-        };
-        reader.readAsText(file, 'windows-1250');
-    });
-
-    function startScanner() {
-        scanner.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, (t) => {
-            scanner.pause(true);
-            searchById(t);
-        }).catch(err => console.error(err));
-    }
-
-    function restartScanner() {
-        scanner.stop().then(() => startScanner()).catch(() => startScanner());
-    }
-
-    function searchById(id) {
-        const idx = csvData.findIndex(r => String(r.IdText).trim() === String(id).trim());
-        if (idx !== -1) {
-            openForm(idx);
-        } else {
-            alert("ID " + id + " nebylo v seznamu nalezeno.");
-            if (scanner.getState() === 3) scanner.resume();
-        }
-    }
-
-    function openForm(idx) {
-        currentIndex = idx;
-        const row = csvData[idx];
-        document.getElementById('display-id').innerText = row.IdText;
-        document.getElementById('display-name').innerText = row.Name || "";
-        document.getElementById('field-Rpe').value = row.Rpe || "";
-        document.getElementById('field-IdifEq').value = row.IdifEq || "";
-        document.getElementById('field-IdifTouch').value = row.IdifTouch || "";
-        
-        document.getElementById('scan-step').classList.add('hidden');
-        document.getElementById('form-step').classList.remove('hidden');
-    }
-
-    function saveData(isFailed) {
-        const row = csvData[currentIndex];
-        const now = new Date();
-        const dateStr = now.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00";
-        
-        row._wasMeasured = true;
-        row.LastRev = dateStr;
-        row.Date = dateStr;
-        row.Time = now.toLocaleTimeString('cs-CZ');
-        row.AutoRev = "True";
-        
-        row.Rpe = document.getElementById('field-Rpe').value.replace('.', ',');
-        row.IdifEq = document.getElementById('field-IdifEq').value.replace('.', ',');
-        row.IdifTouch = document.getElementById('field-IdifTouch').value.replace('.', ',');
-        row.RisoM_PE = document.getElementById('field-Riso').value.replace('.', ',');
-
-        if (isFailed) {
-            row.Result = "Failed"; row.ResultTotal = "Failed"; row.ResultVisual = "Failed";
-            row.ResultFunct = "Failed"; row.ResultMeas = "Failed";
-            row.MeasNote = prompt("Důvod závady:") || "Nevyhovuje";
-        } else {
-            row.Result = "Passed"; row.ResultTotal = "Passed"; row.ResultVisual = "Passed";
-            row.ResultFunct = "Passed"; row.ResultMeas = "Passed";
-            row.MeasNote = "";
-        }
-
-        Object.assign(row, MOJE_UDAJE);
-        localStorage.setItem('revize_data', JSON.stringify(csvData));
-        showScan();
-    }
-
-    function openAddModal() {
-        const nextIdNum = Math.max(...csvData.map(r => parseInt(r.IdText) || 0)) + 1;
-        document.getElementById('new-IdText').value = "";
-        document.getElementById('new-IdText').placeholder = "Další: " + String(nextIdNum).padStart(3, '0');
-        document.getElementById('new-Name').value = "";
-        document.getElementById('new-Tree1').value = "";
-        document.getElementById('add-modal').classList.remove('hidden');
-    }
-
-    function closeAddModal() { document.getElementById('add-modal').classList.add('hidden'); }
-
-    function addNewItem() {
-        const idInput = document.getElementById('new-IdText');
-        const id = idInput.value || idInput.placeholder.replace('Další: ', '');
-        
-        if (csvData.some(r => String(r.IdText).trim() === id)) return alert("Toto ID už existuje!");
-
-        const newItem = {};
-        csvHeaders.forEach(h => newItem[h] = "");
-        newItem.IdText = id;
-        newItem.Name = document.getElementById('new-Name').value;
-        newItem.MeasClass = document.getElementById('new-MeasClass').value;
-        newItem.Interval = document.getElementById('new-Interval').value;
-        newItem.Tree1 = document.getElementById('new-Tree1').value;
-        newItem._wasMeasured = false;
-
-        csvData.push(newItem);
-        localStorage.setItem('revize_data', JSON.stringify(csvData));
-        closeAddModal();
-        openForm(csvData.length - 1);
-    }
-
-    function updateRoomList() {
-        const rooms = [...new Set(csvData.map(item => item.Tree1).filter(Boolean))];
-        const list = document.getElementById('room-list');
-        list.innerHTML = "";
-        rooms.forEach(r => { let o = document.createElement('option'); o.value = r; list.appendChild(o); });
-    }
-
-    function showScan() {
-        document.getElementById('form-step').classList.add('hidden');
-        document.getElementById('scan-step').classList.remove('hidden');
-        if (scanner.getState() === 3) scanner.resume();
-    }
-
-    function downloadFinalCSV() {
-        let csvRows = [csvHeaders.join(';')];
-        const clearFields = ["AutoRev","ResultTotal","ResultVisual","ResultFunct","ResultMeas","TechName","TechSurname","TechLicence","TechPhone","TechEmail","DevName","DevSerialNumber","Date","Time","MeasNote","Rpe
+<div id="add-modal" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:999; padding:15px; box-sizing:border-box;">
+    <div class="card" style="max-height:90vh; overflow-y:auto;">
+        <h3>Nový spotřebič</h3>
+        <label>ID (IdText)</label><input type="text" id="new-IdText">
+        <label>Název</label><input type="text" id="new-Name">
+        <label>Třída</label><select id="new-MeasClass"><option>I</option><option>II</option><option>III</option></select>
+        <label>Místnost</label><input type="text" id
