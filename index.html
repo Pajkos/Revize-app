@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Revizák Scan Pro – v2.7.3</title>
+    <title>Revizák Scan Pro – v2.7.4 (FINAL FIX)</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -80,9 +80,9 @@
         <input type="text" id="new-Name">
         <label>Kategorie</label>
         <select id="new-Category">
-            <option>ČSN 33 1600 ed.2 - Spotřebiče</option>
-            <option>ČSN EN 60974-4 ed.2 – Svářečky</option>
-            <option>ČSN EN 60204-1 ed.2 – El. zařízení strojů</option>
+            <option>Spotřebiče</option>
+            <option>Svářečky</option>
+            <option>Stroje</option>
         </select>
         <div class="flex-row">
             <div style="flex:1"><label>Třída</label><select id="new-MeasClass"><option>I</option><option>II</option><option>III</option></select></div>
@@ -113,7 +113,6 @@
     let csvData = [];
     let csvHeaders = [];
     let currentIndex = -1;
-    let isEditing = false;
     let scanner = new Html5Qrcode("reader");
 
     window.onload = () => {
@@ -136,10 +135,9 @@
             Papa.parse(event.target.result, {
                 header: true, skipEmptyLines: true, delimiter: ";",
                 complete: function(results) {
+                    // Nahrání dat - resetujeme příznak měření pro novou relaci
                     csvData = results.data.filter(r => r.IdText).map(row => {
-                        // Pokud nahrávám export, který už byl hotový, zachovám příznak měření
-                        const alreadyDone = row.Date && row.Date !== "" && row.Date !== "01.01.1970 0:00:00";
-                        return {...row, _wasMeasured: alreadyDone};
+                        return {...row, _wasMeasuredToday: false};
                     });
                     csvHeaders = results.meta.fields; 
                     localStorage.setItem('revize_data', JSON.stringify(csvData));
@@ -179,12 +177,11 @@
     }
 
     function openEditCurrent() {
-        isEditing = true;
         const row = csvData[currentIndex];
         document.getElementById('modal-title').innerText = "Upravit spotřebič";
         document.getElementById('new-IdText').value = row.IdText || "";
         document.getElementById('new-Name').value = row.Name || "";
-        document.getElementById('new-Category').value = row.Category || "ČSN 33 1600 ed.2 - Spotřebiče";
+        document.getElementById('new-Category').value = row.Category || "Spotřebiče";
         document.getElementById('new-MeasClass').value = row.MeasClass || "I";
         document.getElementById('new-MeasGroup').value = row.MeasGroup || "A";
         document.getElementById('new-EquipType').value = row.EquipType || "Nepřipevněný";
@@ -219,7 +216,7 @@
         const now = new Date();
         const dateStr = now.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00";
         
-        row._wasMeasured = true; // ZDE SE NASTAVUJE PŘÍZNAK MĚŘENÍ
+        row._wasMeasuredToday = true; // OZNAČENÍ PRO EXPORT
         
         row.LastRev = dateStr; row.Date = dateStr; row.Time = now.toLocaleTimeString('cs-CZ');
         row.AutoRev = "True";
@@ -246,10 +243,9 @@
     }
 
     function openAddModal() { 
-        isEditing = false;
-        const nextIdNum = Math.max(...csvData.map(r => parseInt(r.IdText) || 0)) + 1;
+        const nextIdNum = Math.max(...csvData.map(r => parseInt(r.IdText) || 0), 0) + 1;
         document.getElementById('modal-title').innerText = "Nový spotřebič";
-        document.getElementById('new-IdText').value = nextIdNum.toString().padStart(3, '0');
+        document.getElementById('new-IdText').value = nextIdNum.toString().padStart(4, '0');
         document.getElementById('new-Name').value = "";
         document.getElementById('modal-save-btn').onclick = addNewItem;
         document.getElementById('modal-save-btn').innerText = "ULOŽIT A MĚŘIT";
@@ -271,7 +267,7 @@
         newItem.CableLen = document.getElementById('new-CableLen').value.replace('.', ',');
         newItem.Interval = document.getElementById('new-Interval').value;
         newItem.Tree1 = document.getElementById('new-Tree1').value;
-        newItem._wasMeasured = false;
+        newItem._wasMeasuredToday = false;
         csvData.push(newItem);
         localStorage.setItem('revize_data', JSON.stringify(csvData));
         closeAddModal(); openForm(csvData.length - 1);
@@ -279,24 +275,25 @@
 
     function downloadFinalCSV() {
         let csvRows = [csvHeaders.join(';')];
-        // POLOŽKY, KTERÉ SE SMAŽOU U NENALEZENÝCH (Vše kromě Category, MeasClass atd.)
-        const clearFields = ["Date", "Time", "ResultTotal", "ResultVisual", "ResultFunct", "ResultMeas", "TechName", "TechSurname", "TechLicence", "TechEmail", "TechPhone", "DevName", "DevSerialNumber", "Rpe", "IdifEq", "IdifTouch", "RisoM_PE", "MeasNote"];
+        // CO SE MAŽE U NENALEZENÝCH (Vynecháno Category, Name, Tree1 atd.)
+        const fieldsToReset = ["LastRev", "Date", "Time", "ResultTotal", "ResultVisual", "ResultFunct", "ResultMeas", "TechName", "TechSurname", "TechLicence", "TechEmail", "TechPhone", "DevName", "DevSerialNumber", "Rpe", "IdifEq", "IdifTouch", "RisoM_PE", "MeasNote"];
         
         csvData.forEach(row => {
             if (!row.IdText) return;
             let fRow = {...row};
             
-            // POKUD NEBYLO MĚŘENO V TÉTO RELACI ANI DŘÍVE:
-            if (!fRow._wasMeasured) {
+            // POKUD NEBYLO MĚŘENO DNES:
+            if (!fRow._wasMeasuredToday) {
                 fRow.LastRev = "01.01.1970 0:00:00"; 
                 fRow.Result = "Failed"; 
                 fRow.Note = "Nenalezeno"; 
                 fRow.Archive = "False";
+                fRow.AutoRev = "True";
                 if(fRow.Interval) {
                     let d = new Date(1970, 0, 1); d.setMonth(d.getMonth() + parseInt(fRow.Interval));
                     fRow.NextRev = d.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00";
                 }
-                clearFields.forEach(f => fRow[f] = "");
+                fieldsToReset.forEach(f => { if(fRow[f] !== undefined) fRow[f] = ""; });
             }
             
             let values = csvHeaders.map(h => {
