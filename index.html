@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Revizák Scan Pro – v2.8.5</title>
+    <title>Revizák Scan Pro – v2.8.6 (Fix Revize)</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -21,7 +21,6 @@
         .hidden { display: none; }
         .flex-row { display: flex; gap: 8px; }
         .edit-badge { background: #eee; color: #333; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; border: 1px solid #ccc; float: right; font-weight: bold; }
-        .datalist-container { position: relative; }
     </style>
 </head>
 <body>
@@ -123,7 +122,7 @@
     };
 
     function updateDataLists() {
-        const rooms = [...new Set(csvData.map(r => r.Tree1).filter(Boolean))];
+        const rooms = [...new Set(csvData.map(r => String(r.Tree1 || "").replace(/"/g, '')).filter(Boolean))];
         const list = document.getElementById('tree1-list');
         list.innerHTML = "";
         rooms.forEach(room => { let opt = document.createElement('option'); opt.value = room; list.appendChild(opt); });
@@ -131,18 +130,20 @@
 
     function startScanner() { scanner.start({ facingMode: "environment" }, { fps: 15, qrbox: 200 }, (t) => { scanner.pause(true); searchById(t); }).catch(() => {}); }
     function restartScanner() { scanner.stop().finally(() => startScanner()); }
+    
     function searchById(id) {
-        const idx = csvData.findIndex(r => String(r.IdText).replace(/"/g, '').trim() === String(id).trim());
-        if (idx !== -1) openForm(idx); else { alert("Nenalezeno"); if(scanner.getState() === 3) scanner.resume(); }
+        const searchId = String(id).trim();
+        const idx = csvData.findIndex(r => String(r.IdText).replace(/"/g, '').trim() === searchId);
+        if (idx !== -1) openForm(idx); else { alert("Nenalezeno: " + searchId); if(scanner.getState() === 3) scanner.resume(); }
     }
 
     function openForm(idx) {
         currentIndex = idx; const row = csvData[idx];
         document.getElementById('display-id').innerText = String(row.IdText).replace(/"/g, '');
         document.getElementById('display-name').innerText = String(row.Name).replace(/"/g, '');
-        document.getElementById('field-Rpe').value = row.Rpe || "";
-        document.getElementById('field-IdifEq').value = row.IdifEq || "";
-        document.getElementById('field-IdifTouch').value = row.IdifTouch || "";
+        document.getElementById('field-Rpe').value = (row.Rpe || "").replace(/"/g, '');
+        document.getElementById('field-IdifEq').value = (row.IdifEq || "").replace(/"/g, '');
+        document.getElementById('field-IdifTouch').value = (row.IdifTouch || "").replace(/"/g, '');
         document.getElementById('scan-step').classList.add('hidden'); document.getElementById('form-step').classList.remove('hidden');
     }
 
@@ -159,32 +160,55 @@
         row.MeasNote = isFailed ? (prompt("Důvod závady:") || "Závada") : "";
         Object.assign(row, MOJE_UDAJE);
         if(row.Interval) {
-            let next = new Date(); next.setMonth(next.getMonth() + parseInt(row.Interval));
+            let next = new Date(); next.setMonth(next.getMonth() + parseInt(String(row.Interval).replace(/"/g, '')));
             row.NextRev = next.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00";
         }
         localStorage.setItem('revize_data', JSON.stringify(csvData)); showScan();
     }
 
+    // OPRAVENÁ LOGIKA POROVNÁNÍ DATUMU
     function isRevisionStillValid(val) {
-        if (!val) return false;
-        // ODSTRANĚNÍ UVOZOVEK A MEZER: Klíč pro soubor test another.csv
-        const clean = String(val).replace(/"/g, '').split(' ')[0].replace(/\s/g, '');
-        const p = clean.split('.'); if (p.length < 3) return false;
-        const d = new Date(parseInt(p[2]), parseInt(p[1]) - 1, parseInt(p[0]));
-        const now = new Date(); now.setHours(0,0,0,0);
-        return d > now;
+        if (!val || val === "" || val === '""') return false;
+        try {
+            // Odstraní uvozovky a všechny mezery
+            let clean = String(val).replace(/"/g, '').replace(/\s/g, '');
+            // Odřízne čas, pokud tam je (převezme jen text před prvním mezerou, která tam už není, takže radši split dle tečky)
+            let datePart = clean.split(' ')[0]; 
+            const p = datePart.split('.');
+            if (p.length < 3) return false;
+            
+            const d = parseInt(p[0], 10);
+            const m = parseInt(p[1], 10) - 1;
+            const y = parseInt(p[2], 10);
+            
+            if (isNaN(d) || isNaN(m) || isNaN(y)) return false;
+
+            const nextRevDate = new Date(y, m, d);
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            
+            return nextRevDate >= today;
+        } catch(e) { return false; }
     }
 
     function downloadFinalCSV() {
         let csvRows = [csvHeaders.join(';')];
         const fieldsToClear = ["LastRev", "Date", "Time", "ResultTotal", "ResultVisual", "ResultFunct", "ResultMeas", "TechName", "TechSurname", "TechLicence", "TechEmail", "TechPhone", "DevName", "DevSerialNumber", "Rpe", "IdifEq", "IdifTouch", "RisoM_PE", "MeasNote"];
         csvData.forEach(row => {
-            if (!row.IdText) return; let fRow = {...row};
+            if (!row.IdText) return; 
+            let fRow = {...row};
+            
+            // Kontrola: Pokud nebylo měřeno DNES a revize je propadlá -> smazat a dát Nenalezeno
             if (!fRow._wasMeasuredToday && !isRevisionStillValid(fRow.NextRev)) {
                 fRow.LastRev = "01.01.1970 0:00:00"; fRow.Result = "Failed"; fRow.Note = "Nenalezeno";
                 fieldsToClear.forEach(f => { if(fRow[f] !== undefined) fRow[f] = ""; });
-                if(fRow.Interval) { let d = new Date(1970,0,1); d.setMonth(d.getMonth() + parseInt(fRow.Interval)); fRow.NextRev = d.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00"; }
+                if(fRow.Interval) { 
+                    let inter = parseInt(String(fRow.Interval).replace(/"/g, '')) || 24;
+                    let d = new Date(1970,0,1); d.setMonth(d.getMonth() + inter); 
+                    fRow.NextRev = d.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00"; 
+                }
             }
+            
             let values = csvHeaders.map(h => {
                 let v = fRow[h] === undefined || fRow[h] === null ? "" : String(fRow[h]).replace(/"/g, '');
                 return (v === "" || /^[0-9,.]+$/.test(v.replace('>', '')) || v.includes(':')) ? v : `"${v}"`;
@@ -198,8 +222,8 @@
     function openEditCurrent() { fillModal(csvData[currentIndex]); document.getElementById('modal-save-btn').onclick = () => { saveFromModal(csvData[currentIndex]); openForm(currentIndex); }; document.getElementById('add-modal').classList.remove('hidden'); }
     
     function openAddModal() {
-        // NAŠEPTÁVAČ DALŠÍHO ČÍSLA
-        const maxId = Math.max(...csvData.map(r => parseInt(String(r.IdText).replace(/"/g, ''))).filter(n => !isNaN(n)), 0);
+        const ids = csvData.map(r => parseInt(String(r.IdText).replace(/"/g, '').trim())).filter(n => !isNaN(n));
+        const maxId = ids.length > 0 ? Math.max(...ids) : 0;
         const newId = String(maxId + 1).padStart(4, '0');
         const empty = { IdText: newId, Name:"", Category:"ČSN 33 1600 ed.2 - Spotřebiče", MeasGroup:"D", MeasClass:"I", CableLen:"1,5", Interval:"24", EquipType:"Nepřipevněný", Connection:"Vidlicí 230V", Tree1:"" };
         fillModal(empty);
