@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Revizák Scan Pro – v2.8.7 (Logic Fix)</title>
+    <title>Revizák Scan Pro – v2.8.8</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -123,8 +123,7 @@
 
     function updateDataLists() {
         const rooms = [...new Set(csvData.map(r => String(r.Tree1 || "").replace(/"/g, '')).filter(Boolean))];
-        const list = document.getElementById('tree1-list');
-        list.innerHTML = "";
+        const list = document.getElementById('tree1-list'); list.innerHTML = "";
         rooms.forEach(room => { let opt = document.createElement('option'); opt.value = room; list.appendChild(opt); });
     }
 
@@ -169,17 +168,10 @@
     function isRevisionStillValid(val) {
         if (!val || val === "" || val === '""') return false;
         try {
-            let clean = String(val).replace(/"/g, '').replace(/\s/g, '');
-            let datePart = clean.split(' ')[0]; 
-            const p = datePart.split('.');
-            if (p.length < 3) return false;
-            const d = parseInt(p[0], 10);
-            const m = parseInt(p[1], 10) - 1;
-            const y = parseInt(p[2], 10);
-            if (isNaN(d) || isNaN(m) || isNaN(y)) return false;
-            const nextRevDate = new Date(y, m, d);
-            const today = new Date();
-            today.setHours(0,0,0,0);
+            let clean = String(val).replace(/"/g, '').replace(/\s/g, '').split(' ')[0];
+            const p = clean.split('.'); if (p.length < 3) return false;
+            const nextRevDate = new Date(parseInt(p[2],10), parseInt(p[1],10)-1, parseInt(p[0],10));
+            const today = new Date(); today.setHours(0,0,0,0);
             return nextRevDate >= today;
         } catch(e) { return false; }
     }
@@ -191,11 +183,11 @@
         csvData.forEach(row => {
             if (!row.IdText) return; 
             let fRow = {...row};
-            
-            // LOGIKA EXPORTU:
+            const cizNextRev = String(fRow.NextRev || "").replace(/"/g, '').trim();
+            const valid = isRevisionStillValid(cizNextRev);
+
             if (!fRow._wasMeasuredToday) {
-                // Pokud nebyl dnes změřen a NENÍ platný -> Smazat a Nenalezeno
-                if (!isRevisionStillValid(fRow.NextRev)) {
+                if (!valid) {
                     fRow.LastRev = "01.01.1970 0:00:00"; 
                     fRow.Result = "Failed"; 
                     fRow.Note = "Nenalezeno";
@@ -205,8 +197,7 @@
                         let d = new Date(1970,0,1); d.setMonth(d.getMonth() + inter); 
                         fRow.NextRev = d.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00"; 
                     }
-                } 
-                // Pokud nebyl dnes změřen ale JE platný -> exportuje se beze změny (logic skip)
+                }
             }
             
             let values = csvHeaders.map(h => {
