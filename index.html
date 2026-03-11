@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Revizák Scan Pro – v2.8.6 (Fix Revize)</title>
+    <title>Revizák Scan Pro – v2.8.7 (Logic Fix)</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -166,27 +166,20 @@
         localStorage.setItem('revize_data', JSON.stringify(csvData)); showScan();
     }
 
-    // OPRAVENÁ LOGIKA POROVNÁNÍ DATUMU
     function isRevisionStillValid(val) {
         if (!val || val === "" || val === '""') return false;
         try {
-            // Odstraní uvozovky a všechny mezery
             let clean = String(val).replace(/"/g, '').replace(/\s/g, '');
-            // Odřízne čas, pokud tam je (převezme jen text před prvním mezerou, která tam už není, takže radši split dle tečky)
             let datePart = clean.split(' ')[0]; 
             const p = datePart.split('.');
             if (p.length < 3) return false;
-            
             const d = parseInt(p[0], 10);
             const m = parseInt(p[1], 10) - 1;
             const y = parseInt(p[2], 10);
-            
             if (isNaN(d) || isNaN(m) || isNaN(y)) return false;
-
             const nextRevDate = new Date(y, m, d);
             const today = new Date();
             today.setHours(0,0,0,0);
-            
             return nextRevDate >= today;
         } catch(e) { return false; }
     }
@@ -194,19 +187,26 @@
     function downloadFinalCSV() {
         let csvRows = [csvHeaders.join(';')];
         const fieldsToClear = ["LastRev", "Date", "Time", "ResultTotal", "ResultVisual", "ResultFunct", "ResultMeas", "TechName", "TechSurname", "TechLicence", "TechEmail", "TechPhone", "DevName", "DevSerialNumber", "Rpe", "IdifEq", "IdifTouch", "RisoM_PE", "MeasNote"];
+        
         csvData.forEach(row => {
             if (!row.IdText) return; 
             let fRow = {...row};
             
-            // Kontrola: Pokud nebylo měřeno DNES a revize je propadlá -> smazat a dát Nenalezeno
-            if (!fRow._wasMeasuredToday && !isRevisionStillValid(fRow.NextRev)) {
-                fRow.LastRev = "01.01.1970 0:00:00"; fRow.Result = "Failed"; fRow.Note = "Nenalezeno";
-                fieldsToClear.forEach(f => { if(fRow[f] !== undefined) fRow[f] = ""; });
-                if(fRow.Interval) { 
-                    let inter = parseInt(String(fRow.Interval).replace(/"/g, '')) || 24;
-                    let d = new Date(1970,0,1); d.setMonth(d.getMonth() + inter); 
-                    fRow.NextRev = d.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00"; 
-                }
+            // LOGIKA EXPORTU:
+            if (!fRow._wasMeasuredToday) {
+                // Pokud nebyl dnes změřen a NENÍ platný -> Smazat a Nenalezeno
+                if (!isRevisionStillValid(fRow.NextRev)) {
+                    fRow.LastRev = "01.01.1970 0:00:00"; 
+                    fRow.Result = "Failed"; 
+                    fRow.Note = "Nenalezeno";
+                    fieldsToClear.forEach(f => { if(fRow[f] !== undefined) fRow[f] = ""; });
+                    if(fRow.Interval) { 
+                        let inter = parseInt(String(fRow.Interval).replace(/"/g, '')) || 24;
+                        let d = new Date(1970,0,1); d.setMonth(d.getMonth() + inter); 
+                        fRow.NextRev = d.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00"; 
+                    }
+                } 
+                // Pokud nebyl dnes změřen ale JE platný -> exportuje se beze změny (logic skip)
             }
             
             let values = csvHeaders.map(h => {
