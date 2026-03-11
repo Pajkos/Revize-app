@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Revizák Scan Pro – v2.7.6 (Full Date Check)</title>
+    <title>Revizák Scan Pro – v2.7.7</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -20,7 +20,7 @@
         #reader { width: 100%; max-width: 300px; margin: 15px auto; border-radius: 12px; overflow: hidden; background: #000; border: 2px solid #ddd; }
         .hidden { display: none; }
         .flex-row { display: flex; gap: 10px; }
-        .header-box { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .edit-badge { background: #eee; color: #333; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; border: 1px solid #ccc; float: right; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -49,19 +49,41 @@
 
 <div id="form-step" class="hidden">
     <div class="card">
+        <div class="edit-badge" onclick="openEditCurrent()">⚙️ Upravit kartu</div>
         <h3>ID: <span id="display-id" style="color:var(--primary)"></span></h3>
         <p id="display-name" style="font-weight:bold; color:#333;"></p>
         <hr>
-        <label>Rpe</label> <input type="text" id="field-Rpe" inputmode="decimal">
-        <label>IdifEq</label> <input type="text" id="field-IdifEq" inputmode="decimal">
-        <label>IdifTouch</label> <input type="text" id="field-IdifTouch" inputmode="decimal">
-        <label>RisoM_PE</label> <input type="text" id="field-Riso" value=">19,99">
+        <label>Rpe (Odpor PE)</label> <input type="text" id="field-Rpe" inputmode="decimal">
+        <label>IdifEq (Proud PE)</label> <input type="text" id="field-IdifEq" inputmode="decimal">
+        <label>IdifTouch (Dotyk. proud)</label> <input type="text" id="field-IdifTouch" inputmode="decimal">
+        <label>RisoM_PE (Izolační)</label> <input type="text" id="field-Riso" value=">19,99">
         
         <div class="flex-row" style="margin-top:20px;">
-            <button class="btn-danger" style="flex: 1;" onclick="saveData(true)">KO</button>
+            <button class="btn-danger" style="flex: 1;" onclick="saveData(true)">KO (Závada)</button>
             <button class="btn-success" style="flex: 2;" onclick="saveData(false)">ULOŽIT OK</button>
         </div>
         <button class="btn-outline" onclick="showScan()">ZPĚT</button>
+    </div>
+</div>
+
+<div id="add-modal" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:1000; overflow-y:auto; padding:15px; box-sizing:border-box;">
+    <div class="card">
+        <h3 id="modal-title">Editace spotřebiče</h3>
+        <label>ID Číslo (IdText)</label><input type="text" id="new-IdText">
+        <label>Název</label><input type="text" id="new-Name">
+        <label>Kategorie</label>
+        <select id="new-Category">
+            <option>Spotřebiče</option>
+            <option>Svářečky</option>
+            <option>Stroje</option>
+        </select>
+        <div class="flex-row">
+            <div style="flex:1"><label>Třída</label><select id="new-MeasClass"><option>I</option><option>II</option><option>III</option></select></div>
+            <div style="flex:1"><label>Interval (měs)</label><input type="text" id="new-Interval" value="24"></div>
+        </div>
+        <label>Místnost (Tree1)</label><input type="text" id="new-Tree1">
+        <button class="btn-success" id="modal-save-btn" onclick="addNewItem()">ULOŽIT</button>
+        <button class="btn-outline" onclick="closeAddModal()">ZRUŠIT</button>
     </div>
 </div>
 
@@ -136,6 +158,32 @@
         document.getElementById('form-step').classList.remove('hidden');
     }
 
+    function openEditCurrent() {
+        const row = csvData[currentIndex];
+        document.getElementById('modal-title').innerText = "Upravit kartu";
+        document.getElementById('new-IdText').value = row.IdText || "";
+        document.getElementById('new-Name').value = row.Name || "";
+        document.getElementById('new-Category').value = row.Category || "Spotřebiče";
+        document.getElementById('new-MeasClass').value = row.MeasClass || "I";
+        document.getElementById('new-Interval').value = row.Interval || "24";
+        document.getElementById('new-Tree1').value = row.Tree1 || "";
+        document.getElementById('modal-save-btn').onclick = saveEditedItem;
+        document.getElementById('add-modal').classList.remove('hidden');
+    }
+
+    function saveEditedItem() {
+        const row = csvData[currentIndex];
+        row.IdText = document.getElementById('new-IdText').value;
+        row.Name = document.getElementById('new-Name').value;
+        row.Category = document.getElementById('new-Category').value;
+        row.MeasClass = document.getElementById('new-MeasClass').value;
+        row.Interval = document.getElementById('new-Interval').value;
+        row.Tree1 = document.getElementById('new-Tree1').value;
+        localStorage.setItem('revize_data', JSON.stringify(csvData));
+        closeAddModal();
+        openForm(currentIndex);
+    }
+
     function saveData(isFailed) {
         const row = csvData[currentIndex];
         const now = new Date();
@@ -147,37 +195,32 @@
         row.IdifEq = document.getElementById('field-IdifEq').value.replace('.', ',');
         row.IdifTouch = document.getElementById('field-IdifTouch').value.replace('.', ',');
         row.RisoM_PE = document.getElementById('field-Riso').value.replace('.', ',');
-        row.Result = isFailed ? "Failed" : "Passed";
-        row.ResultTotal = row.Result;
+        
+        if (isFailed) {
+            const reason = prompt("Důvod závady:");
+            row.Result = "Failed"; row.ResultTotal = "Failed"; row.MeasNote = reason || "Závada";
+        } else {
+            row.Result = "Passed"; row.ResultTotal = "Passed"; row.MeasNote = "";
+        }
         Object.assign(row, MOJE_UDAJE);
         if(row.Interval) {
-            let next = new Date(); 
-            next.setMonth(next.getMonth() + parseInt(row.Interval));
+            let next = new Date(); next.setMonth(next.getMonth() + parseInt(row.Interval));
             row.NextRev = next.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00";
         }
         localStorage.setItem('revize_data', JSON.stringify(csvData));
         showScan();
     }
 
-    // PŘESNÁ KONTROLA DATA (DEN, MĚSÍC, ROK)
     function isRevisionStillValid(nextRevStr) {
         if (!nextRevStr || nextRevStr.trim() === "") return false;
         try {
-            // Illko formát: "15.02.2025 0:00:00" nebo "15.02.2025"
             const datePart = nextRevStr.split(' ')[0];
             const parts = datePart.split('.');
-            if (parts.length < 3) return false;
-            
-            // JavaScript Date bere měsíce od 0 do 11
             const nextRevDate = new Date(parts[2], parts[1] - 1, parts[0]);
             const today = new Date();
-            today.setHours(0, 0, 0, 0); // Vynulujeme čas pro přesné porovnání jen kalendářního dne
-            
-            // Pokud je příští revize po dnešku (zítra a dál), vracíme true (je platná)
+            today.setHours(0,0,0,0);
             return nextRevDate > today;
-        } catch(e) { 
-            return false; 
-        }
+        } catch(e) { return false; }
     }
 
     function downloadFinalCSV() {
@@ -187,8 +230,6 @@
         csvData.forEach(row => {
             if (!row.IdText) return;
             let fRow = {...row};
-            
-            // PODMÍNKA: Pokud nebylo pípnuté dnes A ZÁROVEŇ revize už propadla (je dnes nebo byla včera a dřív)
             if (!fRow._wasMeasuredToday && !isRevisionStillValid(fRow.NextRev)) {
                 fRow.LastRev = "01.01.1970 0:00:00"; 
                 fRow.Result = "Failed"; 
@@ -197,15 +238,12 @@
                 fRow.AutoRev = "True";
                 fieldsToReset.forEach(f => { if(fRow[f] !== undefined) fRow[f] = ""; });
                 if(fRow.Interval) {
-                    let d = new Date(1970, 0, 1); 
-                    d.setMonth(d.getMonth() + parseInt(fRow.Interval));
+                    let d = new Date(1970, 0, 1); d.setMonth(d.getMonth() + parseInt(fRow.Interval));
                     fRow.NextRev = d.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00";
                 }
             }
-            
             let values = csvHeaders.map(h => {
                 let v = fRow[h] === undefined || fRow[h] === null ? "" : String(fRow[h]);
-                // Ošetření uvozovek u textových polí s diakritikou pro Excel/Illko
                 return (v === "" || /^[0-9,.]+$/.test(v.replace('>', '')) || v.includes(':')) ? v : `"${v}"`;
             });
             csvRows.push(values.join(';'));
@@ -214,6 +252,32 @@
         const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "export_illko.csv"; link.click();
     }
 
+    function openAddModal() { 
+        document.getElementById('modal-title').innerText = "Nový spotřebič";
+        document.getElementById('new-IdText').value = "";
+        document.getElementById('new-Name').value = "";
+        document.getElementById('modal-save-btn').onclick = addNewItem;
+        document.getElementById('add-modal').classList.remove('hidden'); 
+    }
+
+    function addNewItem() {
+        const id = document.getElementById('new-IdText').value;
+        const newItem = {};
+        csvHeaders.forEach(h => newItem[h] = "");
+        newItem.IdText = id;
+        newItem.Name = document.getElementById('new-Name').value;
+        newItem.Category = document.getElementById('new-Category').value;
+        newItem.MeasClass = document.getElementById('new-MeasClass').value;
+        newItem.Interval = document.getElementById('new-Interval').value;
+        newItem.Tree1 = document.getElementById('new-Tree1').value;
+        newItem._wasMeasuredToday = false;
+        csvData.push(newItem);
+        localStorage.setItem('revize_data', JSON.stringify(csvData));
+        closeAddModal();
+        searchById(id);
+    }
+
+    function closeAddModal() { document.getElementById('add-modal').classList.add('hidden'); }
     function showScan() { document.getElementById('form-step').classList.add('hidden'); document.getElementById('scan-step').classList.remove('hidden'); if(scanner.getState() === 3) scanner.resume(); }
     function manualReset() { if(confirm("Smazat vše?")) { localStorage.clear(); location.reload(); } }
 </script>
