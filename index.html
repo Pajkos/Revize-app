@@ -3,23 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Revizák Scan Pro – v2.7.9 (Date Fix & KO Fix)</title>
+    <title>Revizák Scan Pro – v2.8.2</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
         :root { --primary: #007bff; --success: #28a745; --danger: #dc3545; --dark: #333; }
-        body { font-family: -apple-system, sans-serif; margin: 0; padding: 15px; background: #f4f4f9; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, sans-serif; margin: 0; padding: 10px; background: #f4f4f9; -webkit-tap-highlight-color: transparent; }
         .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }
-        label { display: block; margin-top: 10px; font-weight: bold; font-size: 0.85rem; color: #555; }
-        input, select { width: 100%; padding: 12px; margin: 5px 0 10px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
+        label { display: block; margin-top: 8px; font-weight: bold; font-size: 0.8rem; color: #555; }
+        input, select { width: 100%; padding: 10px; margin: 4px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
         button { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; color: white; margin-bottom: 10px; }
         .btn-success { background: var(--success); }
         .btn-primary { background: var(--primary); }
         .btn-danger { background: var(--danger); }
         .btn-outline { background: none; color: #666; border: 1px solid #ccc; }
-        #reader { width: 100%; max-width: 300px; margin: 15px auto; border-radius: 12px; overflow: hidden; background: #000; border: 2px solid #ddd; }
+        #reader { width: 100%; max-width: 300px; margin: 10px auto; border-radius: 12px; overflow: hidden; background: #000; border: 2px solid #ddd; }
         .hidden { display: none; }
-        .flex-row { display: flex; gap: 10px; }
+        .flex-row { display: flex; gap: 8px; }
         .edit-badge { background: #eee; color: #333; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; border: 1px solid #ccc; float: right; font-weight: bold; }
     </style>
 </head>
@@ -27,7 +27,7 @@
 
 <div id="setup-step">
     <div class="card">
-        <h2>1. Nahrát CSV</h2>
+        <h2>Nahrát CSV</h2>
         <input type="file" id="csv-file" accept=".csv">
     </div>
 </div>
@@ -39,12 +39,11 @@
     </div>
     <div class="card" style="text-align: center;">
         <div id="reader"></div>
-        <button onclick="restartScanner()" class="btn-outline" style="padding: 8px; font-size: 0.8rem; width: auto; margin-bottom: 15px;">🔄 Restart kamery</button>
-        <input type="text" id="manual-search" placeholder="Zadejte ID...">
+        <button onclick="restartScanner()" class="btn-outline" style="padding: 8px; font-size: 0.7rem; width: auto; margin-bottom: 10px;">🔄 Kamera</button>
+        <input type="text" id="manual-search" placeholder="ID ručně...">
         <button class="btn-primary" onclick="searchById(document.getElementById('manual-search').value)">Hledat</button>
     </div>
-    <button onclick="downloadFinalCSV()" style="background:var(--dark); height: 60px;">3. GENEROVAT EXPORT (CSV)</button>
-    <button onclick="manualReset()" class="btn-outline" style="color:var(--danger); border-color:var(--danger); margin-top:20px;">RESETOVAT DATA</button>
+    <button onclick="downloadFinalCSV()" style="background:var(--dark); height: 60px;">3. GENEROVAT EXPORT</button>
 </div>
 
 <div id="form-step" class="hidden">
@@ -66,16 +65,22 @@
     </div>
 </div>
 
-<div id="add-modal" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:1000; overflow-y:auto; padding:15px; box-sizing:border-box;">
+<div id="add-modal" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:1000; overflow-y:auto; padding:10px; box-sizing:border-box;">
     <div class="card">
-        <h3 id="modal-title">Editace</h3>
-        <label>ID Číslo</label><input type="text" id="new-IdText">
-        <label>Název</label><input type="text" id="new-Name">
-        <label>Kategorie</label><input type="text" id="new-Category">
+        <h3 id="modal-title">Editace spotřebiče</h3>
+        <label>ID Číslo (IdText)</label><input type="text" id="new-IdText">
+        <label>Název (Name)</label><input type="text" id="new-Name">
         <div class="flex-row">
+            <div style="flex:1"><label>Skupina</label><select id="new-MeasGroup"><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option><option>G</option></select></div>
             <div style="flex:1"><label>Třída</label><select id="new-MeasClass"><option>I</option><option>II</option><option>III</option></select></div>
-            <div style="flex:1"><label>Interval</label><input type="text" id="new-Interval"></div>
         </div>
+        <div class="flex-row">
+            <div style="flex:1"><label>Přívod (m)</label><input type="text" id="new-CableLen"></div>
+            <div style="flex:1"><label>Interval (m)</label><input type="text" id="new-Interval"></div>
+        </div>
+        <label>Druh (EquipType)</label><select id="new-EquipType"><option>Nepřipevněný</option><option>Připevněný</option><option>Ruční nářadí</option></select>
+        <label>Připojení (Connection)</label><select id="new-Connection"><option>Vidlicí 230V</option><option>Vidlicí 400V</option><option>Pevný přívod</option></select>
+        <label>Kategorie</label><input type="text" id="new-Category">
         <label>Místnost (Tree1)</label><input type="text" id="new-Tree1">
         <button class="btn-success" id="modal-save-btn">ULOŽIT</button>
         <button class="btn-outline" onclick="closeAddModal()">ZRUŠIT</button>
@@ -114,9 +119,7 @@
             Papa.parse(event.target.result, {
                 header: true, skipEmptyLines: true, delimiter: ";",
                 complete: function(results) {
-                    csvData = results.data.filter(r => r.IdText).map(row => {
-                        return {...row, _wasMeasuredToday: false};
-                    });
+                    csvData = results.data.filter(r => r.IdText).map(row => ({...row, _wasMeasuredToday: false}));
                     csvHeaders = results.meta.fields; 
                     localStorage.setItem('revize_data', JSON.stringify(csvData));
                     localStorage.setItem('revize_headers', JSON.stringify(csvHeaders));
@@ -130,15 +133,15 @@
     function startScanner() {
         scanner.start({ facingMode: "environment" }, { fps: 15, qrbox: 200 }, (t) => {
             scanner.pause(true); searchById(t);
-        }).catch(err => console.log(err));
+        }).catch(() => {});
     }
 
-    function restartScanner() { scanner.stop().then(() => startScanner()).catch(() => startScanner()); }
+    function restartScanner() { scanner.stop().finally(() => startScanner()); }
 
     function searchById(id) {
         const idx = csvData.findIndex(r => String(r.IdText).trim() === String(id).trim());
         if (idx !== -1) openForm(idx);
-        else { alert("ID " + id + " nenalezeno."); if(scanner.getState() === 3) scanner.resume(); }
+        else { alert("Nenalezeno"); if(scanner.getState() === 3) scanner.resume(); }
     }
 
     function openForm(idx) {
@@ -157,8 +160,15 @@
         const row = csvData[currentIndex];
         const now = new Date();
         const dateStr = now.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00";
+        const resultValue = isFailed ? "Failed" : "Passed";
+        
         row._wasMeasuredToday = true;
         row.LastRev = dateStr; row.Date = dateStr; row.Time = now.toLocaleTimeString('cs-CZ');
+        row.Result = resultValue;
+        row.ResultTotal = resultValue;
+        row.ResultVisual = resultValue;
+        row.ResultFunct = resultValue;
+        row.ResultMeas = resultValue;
         row.AutoRev = "True";
         row.Rpe = document.getElementById('field-Rpe').value.replace('.', ',');
         row.IdifEq = document.getElementById('field-IdifEq').value.replace('.', ',');
@@ -166,11 +176,12 @@
         row.RisoM_PE = document.getElementById('field-Riso').value.replace('.', ',');
         
         if (isFailed) {
-            const reason = prompt("Důvod závady:");
-            row.Result = "Failed"; row.ResultTotal = "Failed"; row.MeasNote = reason || "Závada";
+            const reason = prompt("Zadejte důvod závady:");
+            row.MeasNote = reason || "Závada";
         } else {
-            row.Result = "Passed"; row.ResultTotal = "Passed"; row.MeasNote = "";
+            row.MeasNote = "";
         }
+
         Object.assign(row, MOJE_UDAJE);
         if(row.Interval) {
             let next = new Date(); next.setMonth(next.getMonth() + parseInt(row.Interval));
@@ -180,34 +191,30 @@
         showScan();
     }
 
-    // OPRAVA: Robustní čtení data i s mezerami (11. 1. 2026)
-    function isRevisionStillValid(nextRevStr) {
-        if (!nextRevStr || String(nextRevStr).trim() === "") return false;
+    function isRevisionStillValid(val) {
+        if (!val) return false;
         try {
-            // Odstraní všechny mezery: "11. 1. 2026" -> "11.1.2026"
-            const cleanDate = String(nextRevStr).split(' ')[0].replace(/\s/g, '');
-            const parts = cleanDate.split('.');
-            if (parts.length < 3) return false;
-            const nextRevDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-            const today = new Date();
-            today.setHours(0,0,0,0);
+            const clean = String(val).split(' ')[0].replace(/\s/g, '');
+            const p = clean.split('.');
+            if (p.length < 3) return false;
+            const nextRevDate = new Date(parseInt(p[2]), parseInt(p[1]) - 1, parseInt(p[0]));
+            const today = new Date(); today.setHours(0,0,0,0);
             return nextRevDate > today;
         } catch(e) { return false; }
     }
 
     function downloadFinalCSV() {
         let csvRows = [csvHeaders.join(';')];
-        const fieldsToReset = ["LastRev", "Date", "Time", "ResultTotal", "ResultVisual", "ResultFunct", "ResultMeas", "TechName", "TechSurname", "TechLicence", "TechEmail", "TechPhone", "DevName", "DevSerialNumber", "Rpe", "IdifEq", "IdifTouch", "RisoM_PE", "MeasNote"];
+        const fieldsToClear = ["LastRev", "Date", "Time", "ResultTotal", "ResultVisual", "ResultFunct", "ResultMeas", "TechName", "TechSurname", "TechLicence", "TechEmail", "TechPhone", "DevName", "DevSerialNumber", "Rpe", "IdifEq", "IdifTouch", "RisoM_PE", "MeasNote"];
         
         csvData.forEach(row => {
             if (!row.IdText) return;
             let fRow = {...row};
-            // PODMÍNKA: Není dnes měřeno A ZÁROVEŇ revize vypršela
             if (!fRow._wasMeasuredToday && !isRevisionStillValid(fRow.NextRev)) {
                 fRow.LastRev = "01.01.1970 0:00:00"; 
                 fRow.Result = "Failed"; 
-                fRow.Note = "Nenalezeno"; 
-                fieldsToReset.forEach(f => { if(fRow[f] !== undefined) fRow[f] = ""; });
+                fRow.Note = "Nenalezeno";
+                fieldsToClear.forEach(f => { if(fRow[f] !== undefined) fRow[f] = ""; });
                 if(fRow.Interval) {
                     let d = new Date(1970, 0, 1); d.setMonth(d.getMonth() + parseInt(fRow.Interval));
                     fRow.NextRev = d.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00";
@@ -225,39 +232,21 @@
 
     function openEditCurrent() {
         const row = csvData[currentIndex];
-        document.getElementById('new-IdText').value = row.IdText || "";
-        document.getElementById('new-Name').value = row.Name || "";
-        document.getElementById('new-Category').value = row.Category || "";
-        document.getElementById('new-MeasClass').value = row.MeasClass || "I";
-        document.getElementById('new-Interval').value = row.Interval || "";
-        document.getElementById('new-Tree1').value = row.Tree1 || "";
-        document.getElementById('modal-save-btn').onclick = () => {
-            row.IdText = document.getElementById('new-IdText').value;
-            row.Name = document.getElementById('new-Name').value;
-            row.Category = document.getElementById('new-Category').value;
-            row.MeasClass = document.getElementById('new-MeasClass').value;
-            row.Interval = document.getElementById('new-Interval').value;
-            row.Tree1 = document.getElementById('new-Tree1').value;
-            localStorage.setItem('revize_data', JSON.stringify(csvData));
-            closeAddModal(); openForm(currentIndex);
-        };
+        document.getElementById('modal-title').innerText = "Upravit kartu";
+        fillModal(row);
+        document.getElementById('modal-save-btn').onclick = () => { saveFromModal(row); openForm(currentIndex); };
         document.getElementById('add-modal').classList.remove('hidden');
     }
 
     function openAddModal() {
-        document.getElementById('new-IdText').value = "";
-        document.getElementById('new-Name').value = "";
+        document.getElementById('modal-title').innerText = "Nový spotřebič";
+        const emptyRow = { IdText:"", Name:"", MeasGroup:"D", MeasClass:"I", CableLen:"1,5", Interval:"24", EquipType:"Nepřipevněný", Connection:"Vidlicí 230V", Category:"", Tree1:"" };
+        fillModal(emptyRow);
         document.getElementById('modal-save-btn').onclick = () => {
             const id = document.getElementById('new-IdText').value;
             if(!id) return;
-            const newItem = {};
-            csvHeaders.forEach(h => newItem[h] = "");
-            newItem.IdText = id;
-            newItem.Name = document.getElementById('new-Name').value;
-            newItem.Category = document.getElementById('new-Category').value;
-            newItem.MeasClass = document.getElementById('new-MeasClass').value;
-            newItem.Interval = document.getElementById('new-Interval').value;
-            newItem.Tree1 = document.getElementById('new-Tree1').value;
+            const newItem = {}; csvHeaders.forEach(h => newItem[h] = "");
+            saveFromModal(newItem);
             newItem._wasMeasuredToday = false;
             csvData.push(newItem);
             localStorage.setItem('revize_data', JSON.stringify(csvData));
@@ -266,9 +255,36 @@
         document.getElementById('add-modal').classList.remove('hidden');
     }
 
+    function fillModal(row) {
+        document.getElementById('new-IdText').value = row.IdText || "";
+        document.getElementById('new-Name').value = row.Name || "";
+        document.getElementById('new-MeasGroup').value = row.MeasGroup || "D";
+        document.getElementById('new-MeasClass').value = row.MeasClass || "I";
+        document.getElementById('new-CableLen').value = row.CableLen || "1,5";
+        document.getElementById('new-Interval').value = row.Interval || "24";
+        document.getElementById('new-EquipType').value = row.EquipType || "Nepřipevněný";
+        document.getElementById('new-Connection').value = row.Connection || "Vidlicí 230V";
+        document.getElementById('new-Category').value = row.Category || "";
+        document.getElementById('new-Tree1').value = row.Tree1 || "";
+    }
+
+    function saveFromModal(row) {
+        row.IdText = document.getElementById('new-IdText').value;
+        row.Name = document.getElementById('new-Name').value;
+        row.MeasGroup = document.getElementById('new-MeasGroup').value;
+        row.MeasClass = document.getElementById('new-MeasClass').value;
+        row.CableLen = document.getElementById('new-CableLen').value;
+        row.Interval = document.getElementById('new-Interval').value;
+        row.EquipType = document.getElementById('new-EquipType').value;
+        row.Connection = document.getElementById('new-Connection').value;
+        row.Category = document.getElementById('new-Category').value;
+        row.Tree1 = document.getElementById('new-Tree1').value;
+        localStorage.setItem('revize_data', JSON.stringify(csvData));
+        closeAddModal();
+    }
+
     function closeAddModal() { document.getElementById('add-modal').classList.add('hidden'); }
     function showScan() { document.getElementById('form-step').classList.add('hidden'); document.getElementById('scan-step').classList.remove('hidden'); if(scanner.getState() === 3) scanner.resume(); }
-    function manualReset() { if(confirm("Smazat vše?")) { localStorage.clear(); location.reload(); } }
 </script>
 </body>
 </html>
