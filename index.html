@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Revizák Scan Pro – v2.7.4 (FINAL FIX)</title>
+    <title>Revizák Scan Pro – v2.7.6 (Full Date Check)</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -21,7 +21,6 @@
         .hidden { display: none; }
         .flex-row { display: flex; gap: 10px; }
         .header-box { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .edit-badge { background: #eee; color: #333; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; border: 1px solid #ccc; float: right; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -36,7 +35,7 @@
 <div id="scan-step" class="hidden">
     <div class="header-box">
         <h2 style="margin:0;">Skenovat</h2>
-        <button onclick="openAddModal()" style="width:auto; padding:10px 20px; margin:0;" class="btn-primary">+ Nový spotřebič</button>
+        <button onclick="openAddModal()" style="width:auto; padding:10px 20px; margin:0;" class="btn-primary">+ Nový</button>
     </div>
     <div class="card" style="text-align: center;">
         <div id="reader"></div>
@@ -50,56 +49,19 @@
 
 <div id="form-step" class="hidden">
     <div class="card">
-        <div class="edit-badge" onclick="openEditCurrent()">⚙️ Upravit kartu</div>
-        <h3>ID: <span id="display-id" style="color:var(--primary)"></span> (<span id="display-class"></span>)</h3>
-        <p id="display-name" style="font-weight:bold; margin-top:-10px; color:#333;"></p>
+        <h3>ID: <span id="display-id" style="color:var(--primary)"></span></h3>
+        <p id="display-name" style="font-weight:bold; color:#333;"></p>
         <hr>
-        <label>Rpe (Odpor ochranného vodiče)</label>
-        <input type="text" id="field-Rpe" inputmode="decimal">
-        <label>IdifEq (Unikající proud PE)</label>
-        <input type="text" id="field-IdifEq" inputmode="decimal">
-        <label>IdifTouch (Dotykový proud)</label>
-        <input type="text" id="field-IdifTouch" inputmode="decimal">
-        <label>RisoM_PE (Izolační odpor)</label>
-        <input type="text" id="field-Riso" value=">19,99">
+        <label>Rpe</label> <input type="text" id="field-Rpe" inputmode="decimal">
+        <label>IdifEq</label> <input type="text" id="field-IdifEq" inputmode="decimal">
+        <label>IdifTouch</label> <input type="text" id="field-IdifTouch" inputmode="decimal">
+        <label>RisoM_PE</label> <input type="text" id="field-Riso" value=">19,99">
         
         <div class="flex-row" style="margin-top:20px;">
-            <button class="btn-danger" style="flex: 1;" onclick="saveData(true)">KO (Závada)</button>
+            <button class="btn-danger" style="flex: 1;" onclick="saveData(true)">KO</button>
             <button class="btn-success" style="flex: 2;" onclick="saveData(false)">ULOŽIT OK</button>
         </div>
         <button class="btn-outline" onclick="showScan()">ZPĚT</button>
-    </div>
-</div>
-
-<div id="add-modal" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:1000; overflow-y:auto; padding:15px; box-sizing:border-box;">
-    <div class="card">
-        <h3 id="modal-title">Nový spotřebič</h3>
-        <label>ID Číslo (IdText)</label>
-        <input type="text" id="new-IdText">
-        <label>Název spotřebiče</label>
-        <input type="text" id="new-Name">
-        <label>Kategorie</label>
-        <select id="new-Category">
-            <option>Spotřebiče</option>
-            <option>Svářečky</option>
-            <option>Stroje</option>
-        </select>
-        <div class="flex-row">
-            <div style="flex:1"><label>Třída</label><select id="new-MeasClass"><option>I</option><option>II</option><option>III</option></select></div>
-            <div style="flex:1"><label>Skupina</label><select id="new-MeasGroup"><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option></select></div>
-        </div>
-        <label>Typ (EquipType)</label>
-        <select id="new-EquipType"><option>Nepřipevněný</option><option>Držený v ruce</option><option>Připevněný</option></select>
-        <label>Připojení (Connection)</label>
-        <select id="new-Connection"><option>Vidlicí 230V</option><option>Vidlicí 3 x 400V</option><option>Trvalé připojení 230V</option><option>Trvalé připojení 3 x 400V</option></select>
-        <div class="flex-row">
-            <div style="flex:1"><label>Délka (m)</label><input type="text" id="new-CableLen" value="1,5"></div>
-            <div style="flex:1"><label>Interval (měs)</label><input type="text" id="new-Interval" value="24"></div>
-        </div>
-        <label>Místnost (Tree1)</label>
-        <input type="text" id="new-Tree1">
-        <button class="btn-success" id="modal-save-btn" onclick="addNewItem()">ULOŽIT A MĚŘIT</button>
-        <button class="btn-outline" onclick="closeAddModal()">ZRUŠIT</button>
     </div>
 </div>
 
@@ -135,7 +97,6 @@
             Papa.parse(event.target.result, {
                 header: true, skipEmptyLines: true, delimiter: ";",
                 complete: function(results) {
-                    // Nahrání dat - resetujeme příznak měření pro novou relaci
                     csvData = results.data.filter(r => r.IdText).map(row => {
                         return {...row, _wasMeasuredToday: false};
                     });
@@ -160,7 +121,7 @@
     function searchById(id) {
         const idx = csvData.findIndex(r => String(r.IdText).trim() === String(id).trim());
         if (idx !== -1) openForm(idx);
-        else { alert("ID " + id + " nenalezeno."); if(scanner.getState() === 3) scanner.resume(); }
+        else { alert("Nenalezeno"); if(scanner.getState() === 3) scanner.resume(); }
     }
 
     function openForm(idx) {
@@ -168,7 +129,6 @@
         const row = csvData[idx];
         document.getElementById('display-id').innerText = row.IdText || "";
         document.getElementById('display-name').innerText = row.Name || "";
-        document.getElementById('display-class').innerText = "Třída " + (row.MeasClass || "?");
         document.getElementById('field-Rpe').value = row.Rpe || "";
         document.getElementById('field-IdifEq').value = row.IdifEq || "";
         document.getElementById('field-IdifTouch').value = row.IdifTouch || "";
@@ -176,138 +136,84 @@
         document.getElementById('form-step').classList.remove('hidden');
     }
 
-    function openEditCurrent() {
-        const row = csvData[currentIndex];
-        document.getElementById('modal-title').innerText = "Upravit spotřebič";
-        document.getElementById('new-IdText').value = row.IdText || "";
-        document.getElementById('new-Name').value = row.Name || "";
-        document.getElementById('new-Category').value = row.Category || "Spotřebiče";
-        document.getElementById('new-MeasClass').value = row.MeasClass || "I";
-        document.getElementById('new-MeasGroup').value = row.MeasGroup || "A";
-        document.getElementById('new-EquipType').value = row.EquipType || "Nepřipevněný";
-        document.getElementById('new-Connection').value = row.Connection || "Vidlicí 230V";
-        document.getElementById('new-CableLen').value = (row.CableLen || "1,5").replace(',', '.');
-        document.getElementById('new-Interval').value = row.Interval || "24";
-        document.getElementById('new-Tree1').value = row.Tree1 || "";
-        document.getElementById('modal-save-btn').onclick = saveEditedItem;
-        document.getElementById('modal-save-btn').innerText = "ULOŽIT ZMĚNY";
-        document.getElementById('add-modal').classList.remove('hidden');
-    }
-
-    function saveEditedItem() {
-        const row = csvData[currentIndex];
-        row.IdText = document.getElementById('new-IdText').value;
-        row.Name = document.getElementById('new-Name').value;
-        row.Category = document.getElementById('new-Category').value;
-        row.MeasClass = document.getElementById('new-MeasClass').value;
-        row.MeasGroup = document.getElementById('new-MeasGroup').value;
-        row.EquipType = document.getElementById('new-EquipType').value;
-        row.Connection = document.getElementById('new-Connection').value;
-        row.CableLen = document.getElementById('new-CableLen').value.replace('.', ',');
-        row.Interval = document.getElementById('new-Interval').value;
-        row.Tree1 = document.getElementById('new-Tree1').value;
-        localStorage.setItem('revize_data', JSON.stringify(csvData));
-        closeAddModal();
-        openForm(currentIndex);
-    }
-
     function saveData(isFailed) {
         const row = csvData[currentIndex];
         const now = new Date();
         const dateStr = now.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00";
-        
-        row._wasMeasuredToday = true; // OZNAČENÍ PRO EXPORT
-        
+        row._wasMeasuredToday = true;
         row.LastRev = dateStr; row.Date = dateStr; row.Time = now.toLocaleTimeString('cs-CZ');
         row.AutoRev = "True";
         row.Rpe = document.getElementById('field-Rpe').value.replace('.', ',');
         row.IdifEq = document.getElementById('field-IdifEq').value.replace('.', ',');
         row.IdifTouch = document.getElementById('field-IdifTouch').value.replace('.', ',');
         row.RisoM_PE = document.getElementById('field-Riso').value.replace('.', ',');
-        if (isFailed) {
-            const reason = prompt("Důvod závady:");
-            row.Result = "Failed"; row.ResultTotal = "Failed"; row.ResultVisual = "Failed";
-            row.ResultFunct = "Failed"; row.ResultMeas = "Failed";
-            row.MeasNote = reason || "Nevyhovuje";
-        } else {
-            row.Result = "Passed"; row.ResultTotal = "Passed"; row.ResultVisual = "Passed";
-            row.ResultFunct = "Passed"; row.ResultMeas = "Passed"; row.MeasNote = "";
-        }
+        row.Result = isFailed ? "Failed" : "Passed";
+        row.ResultTotal = row.Result;
         Object.assign(row, MOJE_UDAJE);
         if(row.Interval) {
-            let next = new Date(); next.setMonth(next.getMonth() + parseInt(row.Interval));
+            let next = new Date(); 
+            next.setMonth(next.getMonth() + parseInt(row.Interval));
             row.NextRev = next.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00";
         }
         localStorage.setItem('revize_data', JSON.stringify(csvData));
         showScan();
     }
 
-    function openAddModal() { 
-        const nextIdNum = Math.max(...csvData.map(r => parseInt(r.IdText) || 0), 0) + 1;
-        document.getElementById('modal-title').innerText = "Nový spotřebič";
-        document.getElementById('new-IdText').value = nextIdNum.toString().padStart(4, '0');
-        document.getElementById('new-Name').value = "";
-        document.getElementById('modal-save-btn').onclick = addNewItem;
-        document.getElementById('modal-save-btn').innerText = "ULOŽIT A MĚŘIT";
-        document.getElementById('add-modal').classList.remove('hidden'); 
-    }
-
-    function addNewItem() {
-        const id = document.getElementById('new-IdText').value;
-        if (csvData.some(r => String(r.IdText).trim() === String(id).trim())) return alert("ID již existuje!");
-        const newItem = {};
-        csvHeaders.forEach(h => newItem[h] = "");
-        newItem.IdText = id;
-        newItem.Name = document.getElementById('new-Name').value;
-        newItem.Category = document.getElementById('new-Category').value;
-        newItem.MeasClass = document.getElementById('new-MeasClass').value;
-        newItem.MeasGroup = document.getElementById('new-MeasGroup').value;
-        newItem.EquipType = document.getElementById('new-EquipType').value;
-        newItem.Connection = document.getElementById('new-Connection').value;
-        newItem.CableLen = document.getElementById('new-CableLen').value.replace('.', ',');
-        newItem.Interval = document.getElementById('new-Interval').value;
-        newItem.Tree1 = document.getElementById('new-Tree1').value;
-        newItem._wasMeasuredToday = false;
-        csvData.push(newItem);
-        localStorage.setItem('revize_data', JSON.stringify(csvData));
-        closeAddModal(); openForm(csvData.length - 1);
+    // PŘESNÁ KONTROLA DATA (DEN, MĚSÍC, ROK)
+    function isRevisionStillValid(nextRevStr) {
+        if (!nextRevStr || nextRevStr.trim() === "") return false;
+        try {
+            // Illko formát: "15.02.2025 0:00:00" nebo "15.02.2025"
+            const datePart = nextRevStr.split(' ')[0];
+            const parts = datePart.split('.');
+            if (parts.length < 3) return false;
+            
+            // JavaScript Date bere měsíce od 0 do 11
+            const nextRevDate = new Date(parts[2], parts[1] - 1, parts[0]);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Vynulujeme čas pro přesné porovnání jen kalendářního dne
+            
+            // Pokud je příští revize po dnešku (zítra a dál), vracíme true (je platná)
+            return nextRevDate > today;
+        } catch(e) { 
+            return false; 
+        }
     }
 
     function downloadFinalCSV() {
         let csvRows = [csvHeaders.join(';')];
-        // CO SE MAŽE U NENALEZENÝCH (Vynecháno Category, Name, Tree1 atd.)
         const fieldsToReset = ["LastRev", "Date", "Time", "ResultTotal", "ResultVisual", "ResultFunct", "ResultMeas", "TechName", "TechSurname", "TechLicence", "TechEmail", "TechPhone", "DevName", "DevSerialNumber", "Rpe", "IdifEq", "IdifTouch", "RisoM_PE", "MeasNote"];
         
         csvData.forEach(row => {
             if (!row.IdText) return;
             let fRow = {...row};
             
-            // POKUD NEBYLO MĚŘENO DNES:
-            if (!fRow._wasMeasuredToday) {
+            // PODMÍNKA: Pokud nebylo pípnuté dnes A ZÁROVEŇ revize už propadla (je dnes nebo byla včera a dřív)
+            if (!fRow._wasMeasuredToday && !isRevisionStillValid(fRow.NextRev)) {
                 fRow.LastRev = "01.01.1970 0:00:00"; 
                 fRow.Result = "Failed"; 
                 fRow.Note = "Nenalezeno"; 
                 fRow.Archive = "False";
                 fRow.AutoRev = "True";
+                fieldsToReset.forEach(f => { if(fRow[f] !== undefined) fRow[f] = ""; });
                 if(fRow.Interval) {
-                    let d = new Date(1970, 0, 1); d.setMonth(d.getMonth() + parseInt(fRow.Interval));
+                    let d = new Date(1970, 0, 1); 
+                    d.setMonth(d.getMonth() + parseInt(fRow.Interval));
                     fRow.NextRev = d.toLocaleDateString('cs-CZ').replace(/\s/g, '') + " 0:00:00";
                 }
-                fieldsToReset.forEach(f => { if(fRow[f] !== undefined) fRow[f] = ""; });
             }
             
             let values = csvHeaders.map(h => {
                 let v = fRow[h] === undefined || fRow[h] === null ? "" : String(fRow[h]);
-                if (h === "CableLen" || h === "Interval") return (v === "" || v === "undefined") ? "0" : v.replace('.', ',');
+                // Ošetření uvozovek u textových polí s diakritikou pro Excel/Illko
                 return (v === "" || /^[0-9,.]+$/.test(v.replace('>', '')) || v.includes(':')) ? v : `"${v}"`;
             });
             csvRows.push(values.join(';'));
         });
         const blob = new Blob(["\uFEFF" + csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "export_illko_final.csv"; link.click();
+        const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "export_illko.csv"; link.click();
     }
 
-    function closeAddModal() { document.getElementById('add-modal').classList.add('hidden'); }
     function showScan() { document.getElementById('form-step').classList.add('hidden'); document.getElementById('scan-step').classList.remove('hidden'); if(scanner.getState() === 3) scanner.resume(); }
     function manualReset() { if(confirm("Smazat vše?")) { localStorage.clear(); location.reload(); } }
 </script>
